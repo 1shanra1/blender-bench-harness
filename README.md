@@ -25,3 +25,13 @@ uv run python scripts/blender_smoke.py
 Uses Blender 5.2.1 and a pinned official MCP revision. Saves a viewport preview to `outputs/viewport.png`, then terminates the sandbox. Runtime outbound networking is blocked.
 
 Direct MCP screenshots return black images under this software display. The check uses Blender's viewport-render operation through MCP instead; agents will need to open the resulting PNG with their image-reading tool. The official server requires MCP SDK 1.x.
+
+Install Codex CLI in the remote image and authenticate:
+
+```sh
+uv run python scripts/codex_setup.py
+```
+
+Complete the printed device login. Credentials are stored in the Modal Secret `blender-bench-codex-auth`, separate from the image and repository.
+
+Run the small Codex/Blender integration check with `uv run python scripts/codex_smoke.py`. It submits one native goal through Codex's app-server interface and observes completion without reprompting. Outputs are saved under `outputs/codex-smoke/`.

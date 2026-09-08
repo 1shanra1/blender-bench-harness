@@ -1,0 +1,8 @@
+cli_auth_credentials_store = "file"
+web_search = "disabled"
+
+[mcp_servers.blender]
+command = "blender-mcp"
+required = true
+startup_timeout_sec = 30
+tool_timeout_sec = 120
