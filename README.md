@@ -35,3 +35,5 @@ uv run python scripts/codex_setup.py
 Complete the printed device login. Credentials are stored in the Modal Secret `blender-bench-codex-auth`, separate from the image and repository.
 
 Run the small Codex/Blender integration check with `uv run python scripts/codex_smoke.py`. It submits one native goal through Codex's app-server interface and observes completion without reprompting. Outputs are saved under `outputs/codex-smoke/`.
+
+For Cursor, run `uv run python scripts/cursor_setup.py` and complete the browser login. Credentials are stored in the Modal Secret `blender-bench-cursor-auth`. Run `uv run python scripts/cursor_smoke.py` to check native goal completion and viewport inspection with Gemini 3.6 Flash Minimal. Outputs go to `outputs/cursor-smoke/`. Cursor uses scoped tool permissions; its kernel sandbox is unavailable on this Modal runtime.
