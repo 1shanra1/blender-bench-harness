@@ -15,3 +15,13 @@ uv run python scripts/modal_smoke.py
 ```
 
 The smoke check starts a temporary CPU sandbox on Modal, verifies remote execution, and terminates it.
+
+Build and check the Blender environment:
+
+```sh
+uv run python scripts/blender_smoke.py
+```
+
+Uses Blender 5.2.1 and a pinned official MCP revision. Saves a viewport preview to `outputs/viewport.png`, then terminates the sandbox. Runtime outbound networking is blocked.
+
+Direct MCP screenshots return black images under this software display. The check uses Blender's viewport-render operation through MCP instead; agents will need to open the resulting PNG with their image-reading tool. The official server requires MCP SDK 1.x.
