@@ -1,0 +1,28 @@
+# Local credentials and configuration
+.env
+.env.*
+!.env.example
+.modal.toml
+.secrets/
+credentials/
+.codex/
+.claude/
+.cursor/
+.gemini/
+.devin/
+
+# Local runtime
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# Private inputs and generated experiment artifacts
+references/
+runs/
+outputs/
+artifacts/
+logs/
+*.blend
+*.blend[0-9]*
