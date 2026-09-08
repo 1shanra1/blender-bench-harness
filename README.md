@@ -37,3 +37,5 @@ Complete the printed device login. Credentials are stored in the Modal Secret `b
 Run the small Codex/Blender integration check with `uv run python scripts/codex_smoke.py`. It submits one native goal through Codex's app-server interface and observes completion without reprompting. Outputs are saved under `outputs/codex-smoke/`.
 
 For Cursor, run `uv run python scripts/cursor_setup.py` and complete the browser login. Credentials are stored in the Modal Secret `blender-bench-cursor-auth`. Run `uv run python scripts/cursor_smoke.py` to check native goal completion and viewport inspection with Gemini 3.6 Flash Minimal. Outputs go to `outputs/cursor-smoke/`. Cursor uses scoped tool permissions; its kernel sandbox is unavailable on this Modal runtime.
+
+For Antigravity CLI, run `uv run python scripts/antigravity_setup.py --login`, complete Google login, then enter `/exit`. The token is stored in `blender-bench-antigravity-auth`. Run `uv run python scripts/antigravity_smoke.py` for the native goal check with Gemini 3.6 Flash Low. Outputs go to `outputs/antigravity-smoke/`; CLI events may abbreviate tool arguments.
