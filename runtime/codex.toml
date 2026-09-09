@@ -2,7 +2,8 @@ cli_auth_credentials_store = "file"
 web_search = "disabled"
 
 [mcp_servers.blender]
-command = "blender-mcp"
+command = "sh"
+args = ["/opt/bench/start_mcp.sh", "blender-mcp"]
 required = true
 startup_timeout_sec = 30
 # Multi-view renders can exceed two minutes on the CPU sandbox.

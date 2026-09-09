@@ -13,8 +13,8 @@ env_key = "AI_GATEWAY_API_KEY"
 wire_api = "responses"
 
 [mcp_servers.blender]
-command = "runuser"
-args = ["-u", "blender", "--", "blender-mcp"]
+command = "sh"
+args = ["/opt/bench/start_mcp.sh", "runuser", "-u", "blender", "--", "blender-mcp"]
 required = true
 startup_timeout_sec = 30
 # Multi-view renders can exceed two minutes on the CPU sandbox.

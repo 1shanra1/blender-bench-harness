@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from event_log import EventLog
+
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open that PNG with your image-viewing tool, and briefly describe what you see. Preserve the scene geometry. Direct screenshot tools return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Do not download anything. Finish once you have visually inspected the preview."""
 OBJECTIVE = os.environ.get('BENCH_OBJECTIVE', OBJECTIVE)
 
@@ -23,7 +25,7 @@ def main():
         config = '/opt/bench/codex.toml'
     (home / 'config.toml').write_bytes(Path(config).read_bytes())
     Path('/workspace').mkdir(exist_ok=True)
-    with open('/tmp/codex-server.log', 'w') as stderr, open('/tmp/codex-events.jsonl', 'w') as events:
+    with open('/tmp/codex-server.log', 'w') as stderr, EventLog('/tmp/codex-events.jsonl') as events:
         server = subprocess.Popen(['codex', 'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, text=True)
         sequence = 0
         complete = False

@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from event_log import EventLog
+
 MODEL = 'gemini-3.6-flash-low'
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open the PNG with your image-reading tool, and briefly describe what you see. Preserve scene geometry. Direct screenshots return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Use MCP and image reading only, no shell commands or downloads. Finish once you have visually inspected the preview."""
 MODEL = os.environ.get('BENCH_MODEL', MODEL)
@@ -38,14 +40,14 @@ def main():
     mcp = Path('/root/.gemini/config')
     mcp.mkdir(parents=True, exist_ok=True)
     (mcp / 'mcp_config.json').write_text(json.dumps({'mcpServers': {'blender': {
-        'command': 'runuser',
-        'args': ['-u', 'blender', '--', 'blender-mcp'],
+        'command': 'sh',
+        'args': ['/opt/bench/start_mcp.sh', 'runuser', '-u', 'blender', '--', 'blender-mcp'],
         'timeoutSeconds': 600,
     }}}))
     command = ['agy', '--model', MODEL, '--print-timeout', os.environ.get('BENCH_SECONDS', '180') + 's',
                '--output-format', 'stream-json', '-p', '/goal ' + OBJECTIVE]
     native_goal = image_read = complete = False
-    with open('/tmp/agy-stderr.log', 'w') as stderr, open('/tmp/agy-events.jsonl', 'w') as events:
+    with open('/tmp/agy-stderr.log', 'w') as stderr, EventLog('/tmp/agy-events.jsonl') as events:
         process = subprocess.Popen(command, cwd='/workspace', stdout=subprocess.PIPE, stderr=stderr, text=True)
         try:
             for line in process.stdout:

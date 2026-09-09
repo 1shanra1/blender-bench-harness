@@ -1,18 +1,33 @@
 """Render an existing scene from six axis-aligned views; never overwrite it."""
 import json
 from pathlib import Path
+import argparse
+import sys
 import bpy
 from mathutils import Vector
 
 OUTPUT = Path('/evaluation')
 OUTPUT.mkdir(exist_ok=True)
 scene = bpy.context.scene
-# The reconstruction prompt excludes floors/backdrops. Frame all visible geometry
-# instead of guessing which parts belong to the object or silently removing parts.
+parser = argparse.ArgumentParser()
+parser.add_argument('--exclude-object', action='append', default=[])
+args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else [])
+# Use the agreed collection, or explicit exclusions for older scenes. Never guess
+# from an object's name or size: a large flat object may be part of the model.
+collection = bpy.data.collections.get('Reconstruction')
+selection = 'Reconstruction collection' if collection else 'all visible geometry'
+members = set(collection.all_objects) if collection else set(scene.objects)
+for name in args.exclude_object:
+    if scene.objects.get(name) is None:
+        raise ValueError(f'Excluded object does not exist: {name}')
 geometry = [o for o in scene.objects if o.type in {'MESH', 'CURVE', 'SURFACE', 'META', 'FONT', 'VOLUME'}
-            and not o.hide_render]
+            and not o.hide_render and o in members and o.name not in args.exclude_object]
 if not geometry:
     raise RuntimeError('No renderable geometry in saved scene')
+excluded = [o.name for o in scene.objects if o.type in {'MESH', 'CURVE', 'SURFACE', 'META', 'FONT', 'VOLUME'}
+            and not o.hide_render and o not in geometry]
+for name in excluded:
+    scene.objects[name].hide_render = True
 depsgraph = bpy.context.evaluated_depsgraph_get()
 points = [o.evaluated_get(depsgraph).matrix_world @ Vector(corner)
           for o in geometry for corner in o.evaluated_get(depsgraph).bound_box]
@@ -47,7 +62,6 @@ scene.view_settings.exposure = 0
 scene.view_settings.gamma = 1
 camera_data = bpy.data.cameras.new('Evaluation Camera')
 camera_data.type = 'ORTHO'
-camera_data.ortho_scale = radius * 2.3
 camera_data.clip_start = radius * 0.001
 camera_data.clip_end = radius * 20
 camera = bpy.data.objects.new('Evaluation Camera', camera_data)
@@ -70,6 +84,10 @@ for name, direction in views.items():
     camera.location = center + Vector(direction) * radius * 4
     rotation = (center - camera.location).to_track_quat('-Z', 'Y')
     camera.rotation_euler = rotation.to_euler()
+    projected = [rotation.inverted() @ (point - center) for point in points]
+    width = max(p.x for p in projected) - min(p.x for p in projected)
+    height = max(p.y for p in projected) - min(p.y for p in projected)
+    camera_data.ortho_scale = max(width, height) * 1.15
     for light, offset in lights:
         light.location = center + rotation @ (offset * radius * 2)
         light.rotation_euler = (center - light.location).to_track_quat('-Z', 'Y').to_euler()
@@ -77,4 +95,5 @@ for name, direction in views.items():
     bpy.ops.render.render(write_still=True)
 (OUTPUT / 'views.json').write_text(json.dumps({'views': views, 'center': list(center),
     'radius': radius, 'engine': 'CYCLES', 'samples': 32, 'resolution': [1024, 1024],
-    'geometry': [o.name for o in geometry]}, indent=2))
+    'geometry': [o.name for o in geometry], 'selection': selection,
+    'excluded_objects': excluded, 'framing_margin': 1.15}, indent=2))

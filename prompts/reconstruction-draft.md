@@ -14,4 +14,8 @@ Save your work to `/workspace/output/scene.blend` as you progress and before fin
 
 ## Shared environment note
 
+Put all reconstructed object parts in a collection named `Reconstruction`. Keep any presentation geometry outside that collection so independent inspection renders can frame the object from different angles.
+
+Save Python scripts that Blender needs to execute in `/workspace/scripts`, which is accessible to both the CLI and Blender in this run. Keep those files readable by the `blender` user; private harness folders under `/root` are not accessible to Blender.
+
 Blender is running and connected to the official Blender MCP server. Use its tools to inspect and modify the scene. To visually inspect work, save a PNG and open it with your image-reading tool. Direct MCP screenshots return black images on this display. For a viewport preview, `bpy.ops.render.opengl(write_still=True, view_context=True)` works when called with a `VIEW_3D` area and `WINDOW` region context override. Standard scene rendering is also available.

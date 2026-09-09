@@ -4,6 +4,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from event_log import EventLog
+
 MODEL = 'gemini-3.6-flash-minimal'
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open the PNG with your image-reading tool, and briefly describe what you see. Preserve scene geometry. Direct screenshots return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Use MCP and image reading only, no shell commands or downloads. Finish once you have visually inspected the preview."""
 MODEL = os.environ.get('BENCH_MODEL', MODEL)
@@ -21,7 +23,7 @@ def main():
     config = Path('/workspace/.cursor')
     config.mkdir(parents=True, exist_ok=True)
     (config / 'mcp.json').write_text(json.dumps({'mcpServers': {'blender': {
-        'command': 'runuser', 'args': ['-u', 'blender', '--', 'blender-mcp']
+        'command': 'sh', 'args': ['/opt/bench/start_mcp.sh', 'runuser', '-u', 'blender', '--', 'blender-mcp']
     }}}))
     permissions = {
         'allow': [
@@ -44,7 +46,7 @@ def main():
                '--sandbox', 'disabled', '--approve-mcps', '--trust',
                '--workspace', '/workspace', '/goal ' + OBJECTIVE]
     goal_created = goal_complete = image_read = False
-    with open('/tmp/cursor-stderr.log', 'w') as stderr, open('/tmp/cursor-events.jsonl', 'w') as events:
+    with open('/tmp/cursor-stderr.log', 'w') as stderr, EventLog('/tmp/cursor-events.jsonl') as events:
         # Cursor loads project permissions from cwd, independently of --workspace.
         process = subprocess.Popen(command, cwd='/workspace', stdout=subprocess.PIPE, stderr=stderr, text=True)
         try:

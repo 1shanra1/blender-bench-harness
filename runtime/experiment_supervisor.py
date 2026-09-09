@@ -69,6 +69,7 @@ def supervise(command, workspace, destination, seconds, env=None):
     started = time.monotonic()
     stopped = threading.Event()
     seen = {}
+    scripts_seen = {}
     capture_errors = []
     log_offset = 0
 
@@ -77,6 +78,7 @@ def supervise(command, workspace, destination, seconds, env=None):
         while not stopped.is_set():
             try:
                 capture_files(workspace, destination, seen, started)
+                capture_files(workspace.parent / 'scripts', destination / 'scripts', scripts_seen, started)
                 with (destination / 'driver.log').open() as log:
                     log.seek(log_offset)
                     text = log.read()
@@ -104,7 +106,7 @@ def supervise(command, workspace, destination, seconds, env=None):
     result = {'exit_code': process.returncode, 'timed_out': timed_out,
         'elapsed_seconds': time.monotonic() - started, 'limit_seconds': seconds,
         'capture_errors': capture_errors}
-    return result, seen, started
+    return result, seen, scripts_seen, started
 
 
 def main():
@@ -114,7 +116,7 @@ def main():
     args = parser.parse_args()
     env = dict(os.environ, BENCH_EXPERIMENT='1', BENCH_SECONDS=str(args.seconds),
         BENCH_OBJECTIVE=Path('/workspace/task.md').read_text())
-    result, seen, started = supervise(['python', f'/opt/bench/{args.harness}_goal_check.py'],
+    result, seen, scripts_seen, started = supervise(['python', f'/opt/bench/{args.harness}_goal_check.py'],
         Path('/workspace/output'), CAPTURE, args.seconds, env)
     # Stop the scene process before final collection, including an in-flight render
     # at the deadline. Unsaved memory is deliberately not turned into a checkpoint.
@@ -125,6 +127,7 @@ def main():
         except (OSError, ProcessLookupError):
             pass
     capture_files(Path('/workspace/output'), CAPTURE, seen, started)
+    capture_files(Path('/workspace/scripts'), CAPTURE / 'scripts', scripts_seen, started)
     final = CAPTURE / 'artifacts'
     final.mkdir(exist_ok=True)
     for path in Path('/workspace/output').rglob('*'):
@@ -132,8 +135,16 @@ def main():
             target = final / path.relative_to('/workspace/output')
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
+    # Preserve shared scripts separately from renderable output artifacts.
+    for path in Path('/workspace/scripts').rglob('*'):
+        if stat.S_ISREG(path.lstat().st_mode):
+            target = CAPTURE / 'scripts/files' / path.relative_to('/workspace/scripts')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
     prefix = {'codex': 'codex', 'cursor': 'cursor', 'antigravity': 'agy'}[args.harness]
-    for name in [f'{prefix}-events.jsonl', f'{prefix}-stderr.log', 'codex-server.log', 'blender.log', 'bench-native-result.json']:
+    for name in [f'{prefix}-events.jsonl', f'{prefix}-events.timestamps.jsonl',
+                 f'{prefix}-stderr.log', 'codex-server.log', 'blender-mcp.log',
+                 'blender.log', 'bench-native-result.json']:
         path = Path('/tmp') / name
         if path.is_file() and not path.is_symlink():
             shutil.copyfile(path, CAPTURE / name)

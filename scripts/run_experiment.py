@@ -41,7 +41,7 @@ def unpack(archive_path, destination):
         archive.extractall(destination, filter="data")
 
 
-def evaluate(folder):
+def evaluate(folder, exclude_objects=()):
     artifacts = folder / "capture/artifacts"
     if not (artifacts / "scene.blend").is_file():
         return {"status": "skipped", "reason": "No final scene.blend saved"}
@@ -63,14 +63,21 @@ def evaluate(folder):
                 if mkdir.returncode:
                     raise RuntimeError(mkdir.stderr.read())
                 sandbox.filesystem.write_bytes(path.read_bytes(), remote)
+        render_arguments = []
+        for name in exclude_objects:
+            render_arguments.extend(["--exclude-object", name])
         process = sandbox.exec(
             "blender",
             "--background",
             "--factory-startup",
             "--disable-autoexec",
+            "--python-exit-code",
+            "1",
             "/workspace/output/scene.blend",
             "--python",
             "/opt/bench/render_views.py",
+            "--",
+            *render_arguments,
             timeout=540,
         )
         (folder / "evaluation.log").write_text(

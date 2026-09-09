@@ -29,8 +29,8 @@ def prepare_workspace(sandbox):
     process = sandbox.exec(
         "sh",
         "-c",
-        "useradd -m blender && mkdir -p /workspace/references /workspace/output "
-        "&& chmod 777 /workspace /workspace/output",
+        "useradd -m blender && mkdir -p /workspace/references /workspace/output /workspace/scripts "
+        "&& chmod 777 /workspace /workspace/output /workspace/scripts",
     )
     process.wait()
     if process.returncode:

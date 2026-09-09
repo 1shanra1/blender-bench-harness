@@ -25,8 +25,11 @@ Each invocation writes a unique directory under ignored `outputs/experiments/`, 
 - `manifest.json`, `prompt.md`: exact submitted prompt, input hashes, requested model/effort, versions, resources, and sandbox ID.
 - `capture/result.json`: native completion, deadline/exit information, and required artifact presence.
 - `capture/artifacts/`: final files from `/workspace/output/`, including the agent's scene and chosen render.
+- `capture/scripts/files/`: final shared scripts from `/workspace/scripts`; `capture/scripts/versions/` and `trajectory.jsonl` retain their saved revisions. Scripts elsewhere are not collected.
 - `capture/versions/` and `capture/trajectory.jsonl`: saved file versions indexed by SHA-256, original path, and observation time.
 - `capture/*events.jsonl` and logs: full streams exposed by the CLIs, including available usage data. Antigravity may abbreviate tool arguments; these are not complete operating-system audits.
+- `capture/*events.timestamps.jsonl`: receipt timestamps keyed by native event line number. These measure when the driver received a line, not when the provider generated it.
+- `capture/blender-mcp.log`: MCP server stderr, kept separate from protocol stdout.
 - `evaluation/`: independent renders and camera metadata. `evaluation.log` records renderer errors.
 - `result.json`: run outcome plus evaluation outcome.
 
@@ -36,6 +39,16 @@ Capture samples saved files every two seconds, retains files stable during the r
 
 Evaluation starts after the agent sandbox is terminated, in another sandbox with no Secrets and blocked networking. Blender opens the final scene with automatic script execution disabled. The evaluator never overwrites the saved scene or sends images back to the agent.
 
-All visible geometry is framed together, including any unwanted floor/backdrop the agent saved. The evaluator replaces cameras, lights, world, and presentation settings, disables compositing and sequencing, and renders the positive and negative X/Y/Z directions orthographically. Axis names are literal; they do not assume models share a semantic front. Materials and geometry are retained. Current settings: 1024×1024, Cycles CPU, 32 samples with denoising, consistent neutral lighting and AgX color management. Rendering has a separate nine-minute process timeout. Use `--skip-evaluation` to collect the agent output without rendering these views.
+The evaluator frames visible geometry in the `Reconstruction` collection, including its child collections. If that collection is absent, it falls back to all visible geometry. Explicit object exclusions support older scenes; no name or size heuristics are used. Each view fits the projected bounds with a 15% margin. Selection and excluded objects are recorded in `views.json`. Geometry outside the selection is hidden only for these inspection renders. The evaluator replaces cameras, lights, world, and presentation settings, disables compositing and sequencing, and renders the positive and negative X/Y/Z directions orthographically. Axis names are literal; they do not assume models share a semantic front. Selected geometry and materials are retained. Current settings: 1024×1024, Cycles CPU, 32 samples with denoising, consistent neutral lighting and AgX color management. Rendering has a separate nine-minute process timeout. Use `--skip-evaluation` to collect the agent output without rendering these views.
 
 These views support inspection, not an automated quality score. Missing/corrupt scenes and renderer failures are reported without substituting an earlier checkpoint. Provider-domain allowlists and harness permissions restrict downloads, but do not constitute a complete audit of content returned by allowed hosts.
+
+To regenerate views from a saved run without invoking a model:
+
+```sh
+uv run python scripts/render_saved.py outputs/experiments/<batch>/<harness> --exclude-object Studio_Backdrop
+```
+
+Exclusion names must exactly match objects in that scene. This replaces the derived `evaluation/` views and writes `inspection-result.json`; the saved model and agent render remain unchanged. Back up earlier inspection views first if you want to retain them.
+
+Blender startup disables Online Essentials catalog access while leaving localhost MCP available. Network allowlists remain in effect.
