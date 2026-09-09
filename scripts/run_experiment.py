@@ -11,7 +11,7 @@ from pathlib import Path
 import modal
 from antigravity_setup import AGY_VERSION
 from codex_setup import CODEX_VERSION
-from cursor_setup import CURSOR_VERSION
+from cursor_setup import CURSOR_VERSION, CURSOR_TIMEOUT_PATCH
 from environment import ROOT, blender_image
 from shared_sandbox import (
     EXPERIMENT_SECONDS,
@@ -103,7 +103,7 @@ def run(harness, batch, skip_evaluation=False):
     result = {}
     try:
         # Extra lifetime is for setup and collection; the supervisor caps the agent
-        # separately and kills its process group at 45 minutes.
+        # separately and kills its process group at 75 minutes.
         sandbox = create_sandbox(
             pairing.image, pairing.secret, pairing.domains, EXPERIMENT_SECONDS + 600
         )
@@ -117,6 +117,8 @@ def run(harness, batch, skip_evaluation=False):
             reasoning_effort="high",
             started_at=datetime.now(timezone.utc).isoformat(),
         )
+        if harness == "cursor":
+            manifest["harness_patch"] = CURSOR_TIMEOUT_PATCH
         (folder / "manifest.json").write_text(json.dumps(manifest, indent=2))
         (folder / "prompt.md").write_bytes(PROMPT.read_bytes())
         start_blender(sandbox)

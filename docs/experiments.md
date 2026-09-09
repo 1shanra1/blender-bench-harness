@@ -12,9 +12,11 @@ Remove `--dry-run` to run those harnesses concurrently. Select only the desired 
 
 ## Lifecycle
 
+Cursor CLI 2026.09.02-c22c1a3 is patched at image build time to give MCP tool calls a 600-second timeout. `runtime/patch_cursor_timeout.py` checks the original bundle hash and changes only the SDK call's timeout option. Run manifests identify this as `mcp-tool-timeout-600s-v1`; native goal behavior is unchanged. The first drill batch predates this patch.
+
 The runner stages `prompts/reconstruction-draft.md` unchanged and submits it once through each harness's native goal interface. The previously verified goal drivers are reused, with smoke-only viewport assertions disabled. They still require native goal completion. There is no custom continuation or feedback loop.
 
-The supervisor starts the 45-minute clock when it launches the harness driver, including CLI startup. On process exit or timeout it terminates the remaining driver process group, stops Blender, and collects artifacts. Setup and collection have additional sandbox lifetime; they do not extend the agent's deadline. A successful process exit without native completion is not recorded as goal completion. A completed goal does not imply that the saved artifacts are valid or match the reference.
+The supervisor starts the 75-minute clock when it launches the harness driver, including CLI startup. On process exit or timeout it terminates the remaining driver process group, stops Blender, and collects artifacts. Setup and collection have additional sandbox lifetime; they do not extend the agent's deadline. A successful process exit without native completion is not recorded as goal completion. A completed goal does not imply that the saved artifacts are valid or match the reference.
 
 ## Outputs
 

@@ -29,7 +29,7 @@ The successful Vercel check is saved at `outputs/pairing-verification/codex-2026
 - Same original reference at `/workspace/references/reference-01.png` and approved prompt at `/workspace/task.md`, with matching SHA-256 hashes. The reference and prompt are read-only to the Blender user.
 - Same output path `/workspace/output/`; no other runs' files, volumes, or histories are mounted.
 - Provider-specific network allowlists are necessary for authentication/inference. Antigravity also requires its Google profile-image host. These are domain-level restrictions, not a complete asset-download audit.
-- The experiment runner enforces a 45-minute agent limit. Compatibility checks have a separate short timeout.
+- The experiment runner enforces a 75-minute agent limit. Compatibility checks have a separate short timeout.
 
 Harness permission implementations and model-serving routes differ; this standardizes the Blender environment and supplied inputs, not the harness internals. Legacy `*_smoke.py` scripts retain their original smaller resource settings.
 

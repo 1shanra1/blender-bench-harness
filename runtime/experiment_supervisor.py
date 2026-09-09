@@ -110,7 +110,7 @@ def supervise(command, workspace, destination, seconds, env=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('harness', choices=['codex', 'cursor', 'antigravity'])
-    parser.add_argument('--seconds', type=int, default=45 * 60)
+    parser.add_argument('--seconds', type=int, default=75 * 60)
     args = parser.parse_args()
     env = dict(os.environ, BENCH_EXPERIMENT='1', BENCH_SECONDS=str(args.seconds),
         BENCH_OBJECTIVE=Path('/workspace/task.md').read_text())

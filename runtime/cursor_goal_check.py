@@ -23,11 +23,23 @@ def main():
     (config / 'mcp.json').write_text(json.dumps({'mcpServers': {'blender': {
         'command': 'runuser', 'args': ['-u', 'blender', '--', 'blender-mcp']
     }}}))
-    (config / 'cli.json').write_text(json.dumps({'permissions': {
-        'allow': ['Read(/workspace/**)', 'Write(/workspace/**)',
-                  'Mcp(blender:get_objects_summary)', 'Mcp(blender:execute_blender_code)'],
-        'deny': ['Shell(*)', 'WebFetch(*)', 'Read(/root/**)', 'Write(/root/**)']
-    }}))
+    permissions = {
+        'allow': [
+            'Read(/workspace/**)',
+            'Write(/workspace/**)',
+            'Shell(*)',
+            'Mcp(blender:get_objects_summary)',
+            'Mcp(blender:get_blendfile_summary_datablocks)',
+            'Mcp(blender:search_api_docs)',
+            'Mcp(blender:execute_blender_code)',
+        ],
+        'deny': [
+            'WebFetch(*)',
+            'Read(/root/**)',
+            'Write(/root/**)',
+        ],
+    }
+    (config / 'cli.json').write_text(json.dumps({'permissions': permissions}, indent=2))
     command = ['cursor-agent', '--model', MODEL, '--print', '--output-format', 'stream-json',
                '--sandbox', 'disabled', '--approve-mcps', '--trust',
                '--workspace', '/workspace', '/goal ' + OBJECTIVE]

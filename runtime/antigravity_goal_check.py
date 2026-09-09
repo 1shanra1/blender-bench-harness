@@ -17,15 +17,30 @@ def main():
     auth = config / 'antigravity-oauth-token'
     auth.write_text(os.environ.pop('AGY_AUTH_TOKEN'))
     auth.chmod(0o600)
-    (config / 'settings.json').write_text(json.dumps({'permissions': {
-        'allow': ['read_file(/root/.gemini/antigravity-cli/builtin)', 'read_file(/workspace)', 'write_file(/workspace)',
-                  'mcp(blender/get_objects_summary)', 'mcp(blender/execute_blender_code)'],
-        'deny': ['command(*)', 'read_url(*)', 'execute_url(*)', 'read_file(/root/.gemini/antigravity-cli/antigravity-oauth-token)']
-    }}))
+    permissions = {
+        'allow': [
+            'read_file(/root/.gemini/antigravity-cli/builtin)',
+            'read_file(/workspace)',
+            'write_file(/workspace)',
+            'command(*)',
+            'mcp(blender/get_objects_summary)',
+            'mcp(blender/get_blendfile_summary_datablocks)',
+            'mcp(blender/search_api_docs)',
+            'mcp(blender/execute_blender_code)',
+        ],
+        'deny': [
+            'read_url(*)',
+            'execute_url(*)',
+            'read_file(/root/.gemini/antigravity-cli/antigravity-oauth-token)',
+        ],
+    }
+    (config / 'settings.json').write_text(json.dumps({'permissions': permissions}, indent=2))
     mcp = Path('/root/.gemini/config')
     mcp.mkdir(parents=True, exist_ok=True)
     (mcp / 'mcp_config.json').write_text(json.dumps({'mcpServers': {'blender': {
-        'command': 'runuser', 'args': ['-u', 'blender', '--', 'blender-mcp']
+        'command': 'runuser',
+        'args': ['-u', 'blender', '--', 'blender-mcp'],
+        'timeoutSeconds': 600,
     }}}))
     command = ['agy', '--model', MODEL, '--print-timeout', os.environ.get('BENCH_SECONDS', '180') + 's',
                '--output-format', 'stream-json', '-p', '/goal ' + OBJECTIVE]

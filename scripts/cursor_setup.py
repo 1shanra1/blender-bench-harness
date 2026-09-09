@@ -4,6 +4,7 @@ import modal
 from environment import ROOT, blender_image
 
 CURSOR_VERSION = "2026.09.02-c22c1a3"
+CURSOR_TIMEOUT_PATCH = "mcp-tool-timeout-600s-v1"
 CURSOR_DOMAINS = ["cursor.com", "*.cursor.com", "*.cursor.sh"]
 AUTH_SECRET = "blender-bench-cursor-auth"
 cursor_image = (
@@ -13,6 +14,8 @@ cursor_image = (
         "ln -s /opt/cursor/cursor-agent /usr/local/bin/cursor-agent",
         "cursor-agent --version",
     )
+    .add_local_file(ROOT / 'runtime/patch_cursor_timeout.py', '/opt/patch_cursor_timeout.py', copy=True)
+    .run_commands('python /opt/patch_cursor_timeout.py', '/opt/cursor/node --check /opt/cursor/index.js')
     .add_local_dir(ROOT / 'runtime', remote_path='/opt/bench')
 )
 

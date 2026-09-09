@@ -2,7 +2,7 @@
 
 Compare how vision models reconstruct editable 3D objects from reference images using coding agents and the [official Blender MCP server](https://www.blender.org/lab/mcp-server/).
 
-Runs use native goal modes in isolated Modal sandboxes, with a 45-minute agent limit, saved-file checkpoints, and independent multiview renders. Current pairings use Gemini 3.8 Flash High with Codex (via Vercel), Cursor, and Antigravity CLI.
+Runs use native goal modes in isolated Modal sandboxes, with a 75-minute agent limit, saved-file checkpoints, and independent multiview renders. Current pairings use Gemini 3.8 Flash High with Codex (via Vercel), Cursor, and Antigravity CLI.
 
 ```sh
 uv sync

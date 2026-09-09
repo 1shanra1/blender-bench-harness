@@ -9,7 +9,7 @@ from typing import NamedTuple, Sequence
 import modal
 from environment import ROOT
 from codex_setup import codex_image, CODEX_VERSION
-from cursor_setup import cursor_image, CURSOR_DOMAINS, CURSOR_VERSION
+from cursor_setup import cursor_image, CURSOR_DOMAINS, CURSOR_VERSION, CURSOR_TIMEOUT_PATCH
 from antigravity_setup import antigravity_image, AGY_VERSION, AGY_DOMAINS
 from shared_sandbox import create_sandbox, prepare_workspace, start_blender
 
@@ -63,6 +63,8 @@ def main():
         manifest.update(harness=name, provider=provider, model=model, reasoning_effort='high', sandbox_id=sandbox.object_id,
                         harness_version={'codex': CODEX_VERSION, 'cursor': CURSOR_VERSION, 'antigravity': AGY_VERSION}[name],
                         verification_objective_sha256=hashlib.sha256(OBJECTIVE.encode()).hexdigest())
+        if name == 'cursor':
+            manifest['harness_patch'] = CURSOR_TIMEOUT_PATCH
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         start_blender(sandbox)
         process = sandbox.exec('python', f'/opt/bench/{name}_goal_check.py',

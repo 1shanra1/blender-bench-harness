@@ -4,7 +4,7 @@ model_reasoning_effort = "high"
 web_search = "disabled"
 
 [features]
-shell_tool = false
+shell_tool = true
 
 [model_providers.openrouter]
 name = "OpenRouter"
@@ -20,4 +20,5 @@ command = "runuser"
 args = ["-u", "blender", "--", "blender-mcp"]
 required = true
 startup_timeout_sec = 30
-tool_timeout_sec = 120
+# Multi-view renders can exceed two minutes on the CPU sandbox.
+tool_timeout_sec = 600

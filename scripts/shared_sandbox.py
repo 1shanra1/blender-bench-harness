@@ -8,7 +8,7 @@ from environment import BLENDER_VERSION, MCP_COMMIT, ROOT
 # Fixed ceilings prevent one pairing from receiving extra burst capacity.
 CPU = (4.0, 4.0)
 MEMORY_MIB = (8192, 8192)
-EXPERIMENT_SECONDS = 45 * 60
+EXPERIMENT_SECONDS = 75 * 60
 REFERENCE = ROOT / "references/drill/reference-01.png"
 PROMPT = ROOT / "prompts/reconstruction-draft.md"
 
