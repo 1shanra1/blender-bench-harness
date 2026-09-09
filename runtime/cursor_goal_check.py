@@ -6,6 +6,9 @@ from pathlib import Path
 
 MODEL = 'gemini-3.6-flash-minimal'
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open the PNG with your image-reading tool, and briefly describe what you see. Preserve scene geometry. Direct screenshots return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Use MCP and image reading only, no shell commands or downloads. Finish once you have visually inspected the preview."""
+MODEL = os.environ.get('BENCH_MODEL', MODEL)
+OBJECTIVE = os.environ.get('BENCH_OBJECTIVE', OBJECTIVE)
+EXPERIMENT = os.environ.get('BENCH_EXPERIMENT') == '1'
 
 
 def main():
@@ -57,7 +60,8 @@ def main():
             process.wait()
             if process.returncode:
                 raise RuntimeError(f'Cursor exited with {process.returncode}')
-            if not (goal_created and goal_complete and image_read):
+            Path('/tmp/bench-native-result.json').write_text(json.dumps({'complete': goal_created and goal_complete}))
+            if not (goal_created and goal_complete and (EXPERIMENT or image_read)):
                 raise RuntimeError('Native goal completion and viewport reading were not both verified; inspect event log')
         finally:
             if process.poll() is None:

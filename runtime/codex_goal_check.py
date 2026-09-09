@@ -5,15 +5,23 @@ import subprocess
 from pathlib import Path
 
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open that PNG with your image-viewing tool, and briefly describe what you see. Preserve the scene geometry. Direct screenshot tools return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Do not download anything. Finish once you have visually inspected the preview."""
+OBJECTIVE = os.environ.get('BENCH_OBJECTIVE', OBJECTIVE)
 
 
 def main():
     home = Path('/root/.codex')
     home.mkdir(exist_ok=True)
-    auth = home / 'auth.json'
-    auth.write_text(os.environ.pop('CODEX_AUTH_JSON'))
-    auth.chmod(0o600)
-    (home / 'config.toml').write_bytes(Path('/opt/bench/codex.toml').read_bytes())
+    gemini_provider = 'AI_GATEWAY_API_KEY' in os.environ or 'OPENROUTER_API_KEY' in os.environ
+    if 'AI_GATEWAY_API_KEY' in os.environ:
+        config = '/opt/bench/codex-vercel.toml'
+    elif 'OPENROUTER_API_KEY' in os.environ:
+        config = '/opt/bench/codex-openrouter.toml'
+    else:
+        auth = home / 'auth.json'
+        auth.write_text(os.environ.pop('CODEX_AUTH_JSON'))
+        auth.chmod(0o600)
+        config = '/opt/bench/codex.toml'
+    (home / 'config.toml').write_bytes(Path(config).read_bytes())
     Path('/workspace').mkdir(exist_ok=True)
     with open('/tmp/codex-server.log', 'w') as stderr, open('/tmp/codex-events.jsonl', 'w') as events:
         server = subprocess.Popen(['codex', 'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, text=True)
@@ -44,8 +52,7 @@ def main():
                     print('Native goal status:', status, flush=True)
                     last_goal_status = status
                 complete = status == 'complete'
-                if status not in ('active', 'complete'):
-                    raise RuntimeError(f'Native goal stopped: {status}')
+                # Read through turn/completed to preserve provider error details.
             if method == 'item/completed':
                 item = params.get('item', {})
                 print('Completed:', item.get('type'), item.get('tool', ''), flush=True)
@@ -70,9 +77,11 @@ def main():
             request('initialize', {'clientInfo': {'name': 'blender_bench_smoke', 'version': '0.1.0'}, 'capabilities': {'experimentalApi': True}})
             send('initialized', {})
             models = request('model/list', {})
-            print('Available models:', ', '.join(m['model'] for m in models['data']), flush=True)
+            print('Gemini catalog entries:', [m['model'] for m in models['data'] if 'gemini-3.8' in m['model']], flush=True)
             thread = request('thread/start', {'cwd': '/workspace', 'approvalPolicy': 'never', 'sandbox': 'danger-full-access'})
-            print('Selected model:', thread.get('model'), flush=True)
+            print('Selected model:', thread.get('model'), 'effort:', thread.get('reasoningEffort'), flush=True)
+            if gemini_provider and (thread.get('model') != 'google/gemini-3.8-flash' or thread.get('reasoningEffort') != 'high'):
+                raise RuntimeError('Requested Gemini model and High effort were not selected')
             request('thread/goal/set', {'threadId': thread['thread']['id'], 'objective': OBJECTIVE, 'status': 'active'})
             while True:
                 event = receive()
@@ -81,6 +90,9 @@ def main():
                         raise RuntimeError(str(event['params']['turn']))
                     if complete:
                         break
+                    if last_goal_status != 'active':
+                        raise RuntimeError(f'Native goal stopped: {last_goal_status}')
+            Path('/tmp/bench-native-result.json').write_text(json.dumps({'complete': True}))
             print('Native goal completed.', flush=True)
         finally:
             server.terminate()

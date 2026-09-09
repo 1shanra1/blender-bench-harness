@@ -6,6 +6,9 @@ from pathlib import Path
 
 MODEL = 'gemini-3.6-flash-low'
 OBJECTIVE = """Verify this Blender installation. Use Blender MCP to inspect the default scene, create a viewport preview at /workspace/viewport.png, open the PNG with your image-reading tool, and briefly describe what you see. Preserve scene geometry. Direct screenshots return black images on this virtual display; bpy.ops.render.opengl(write_still=True, view_context=True) with a VIEW_3D area and WINDOW region override works. Use MCP and image reading only, no shell commands or downloads. Finish once you have visually inspected the preview."""
+MODEL = os.environ.get('BENCH_MODEL', MODEL)
+OBJECTIVE = os.environ.get('BENCH_OBJECTIVE', OBJECTIVE)
+EXPERIMENT = os.environ.get('BENCH_EXPERIMENT') == '1'
 
 
 def main():
@@ -24,7 +27,7 @@ def main():
     (mcp / 'mcp_config.json').write_text(json.dumps({'mcpServers': {'blender': {
         'command': 'runuser', 'args': ['-u', 'blender', '--', 'blender-mcp']
     }}}))
-    command = ['agy', '--model', MODEL, '--print-timeout', '3m',
+    command = ['agy', '--model', MODEL, '--print-timeout', os.environ.get('BENCH_SECONDS', '180') + 's',
                '--output-format', 'stream-json', '-p', '/goal ' + OBJECTIVE]
     native_goal = image_read = complete = False
     with open('/tmp/agy-stderr.log', 'w') as stderr, open('/tmp/agy-events.jsonl', 'w') as events:
@@ -45,7 +48,8 @@ def main():
             process.wait()
             if process.returncode:
                 raise RuntimeError(f'Antigravity exited with {process.returncode}')
-            if not (native_goal and image_read and complete):
+            Path('/tmp/bench-native-result.json').write_text(json.dumps({'complete': native_goal and complete}))
+            if not (native_goal and complete and (EXPERIMENT or image_read)):
                 raise RuntimeError('Native goal completion and viewport reading were not both verified')
         finally:
             if process.poll() is None:

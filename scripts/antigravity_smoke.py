@@ -1,9 +1,7 @@
 """Check Antigravity + Gemini + Blender with one bounded native goal."""
 import modal
 
-from antigravity_setup import antigravity_image
-AUTH_SECRET = 'blender-bench-antigravity-auth'
-AGY_DOMAINS = ['antigravity.google', 'oauth2.googleapis.com', 'www.googleapis.com', 'cloudcode-pa.googleapis.com', 'daily-cloudcode-pa.googleapis.com', 'play.googleapis.com', 'lh3.googleusercontent.com']
+from antigravity_setup import antigravity_image, AUTH_SECRET, AGY_DOMAINS
 from environment import ROOT
 
 

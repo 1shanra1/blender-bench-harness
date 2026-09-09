@@ -1,0 +1,23 @@
+model = "google/gemini-3.8-flash"
+model_provider = "openrouter"
+model_reasoning_effort = "high"
+web_search = "disabled"
+
+[features]
+shell_tool = false
+
+[model_providers.openrouter]
+name = "OpenRouter"
+base_url = "https://openrouter.ai/api/v1"
+wire_api = "responses"
+
+[model_providers.openrouter.auth]
+command = "printenv"
+args = ["OPENROUTER_API_KEY"]
+
+[mcp_servers.blender]
+command = "runuser"
+args = ["-u", "blender", "--", "blender-mcp"]
+required = true
+startup_timeout_sec = 30
+tool_timeout_sec = 120
