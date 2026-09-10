@@ -13,6 +13,7 @@ from antigravity_setup import AGY_VERSION
 from codex_setup import CODEX_VERSION
 from cursor_setup import CURSOR_VERSION, CURSOR_TIMEOUT_PATCH
 from environment import ROOT, blender_image
+from live_collection import LiveCollector
 from shared_sandbox import (
     EXPERIMENT_SECONDS,
     PROMPT,
@@ -62,7 +63,7 @@ def evaluate(folder, exclude_objects=()):
                 mkdir.wait()
                 if mkdir.returncode:
                     raise RuntimeError(mkdir.stderr.read())
-                sandbox.filesystem.write_bytes(path.read_bytes(), remote)
+                sandbox.filesystem.copy_from_local(path, remote)
         render_arguments = []
         for name in exclude_objects:
             render_arguments.extend(["--exclude-object", name])
@@ -90,7 +91,7 @@ def evaluate(folder, exclude_objects=()):
         pack.wait()
         if pack.returncode == 0:
             archive = folder / "evaluation.tar"
-            archive.write_bytes(sandbox.filesystem.read_bytes("/tmp/evaluation.tar"))
+            sandbox.filesystem.copy_to_local("/tmp/evaluation.tar", archive)
             unpack(archive, folder)
             archive.unlink()
         return {
@@ -101,11 +102,12 @@ def evaluate(folder, exclude_objects=()):
         sandbox.terminate()
 
 
-def run(harness, batch, skip_evaluation=False):
+def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, commit=None):
     folder = batch / harness
     folder.mkdir()
     pairing = PAIRINGS[harness]
     sandbox = None
+    collector = None
     stage = "setup"
     result = {}
     try:
@@ -114,7 +116,7 @@ def run(harness, batch, skip_evaluation=False):
         sandbox = create_sandbox(
             pairing.image, pairing.secret, pairing.domains, EXPERIMENT_SECONDS + 600
         )
-        manifest = prepare_workspace(sandbox)
+        manifest = prepare_workspace(sandbox, reference, prompt)
         manifest.update(
             harness=harness,
             harness_version=VERSIONS[harness],
@@ -127,29 +129,40 @@ def run(harness, batch, skip_evaluation=False):
         if harness == "cursor":
             manifest["harness_patch"] = CURSOR_TIMEOUT_PATCH
         (folder / "manifest.json").write_text(json.dumps(manifest, indent=2))
-        (folder / "prompt.md").write_bytes(PROMPT.read_bytes())
-        start_blender(sandbox)
-        stage = "execution"
-        process = sandbox.exec(
-            "python",
-            "/opt/bench/experiment_supervisor.py",
-            harness,
-            "--seconds",
-            str(EXPERIMENT_SECONDS),
-            env={"BENCH_MODEL": pairing.model},
-            timeout=EXPERIMENT_SECONDS + 300,
+        (folder / "prompt.md").write_bytes(
+            PROMPT.read_bytes() if prompt is None else prompt
         )
-        with (folder / "supervisor.log").open("w") as log:
-            for line in process.stdout:
-                log.write(line)
-                log.flush()
-                print(f"[{harness}] {line}", end="", flush=True)
-            log.write(process.stderr.read())
-        process.wait()
+        if commit:
+            commit()
+        start_blender(sandbox)
+        if commit:
+            collector = LiveCollector(sandbox, folder, harness, commit)
+            collector.start()
+        stage = "execution"
+        try:
+            process = sandbox.exec(
+                "python",
+                "/opt/bench/experiment_supervisor.py",
+                harness,
+                "--seconds",
+                str(EXPERIMENT_SECONDS),
+                env={"BENCH_MODEL": pairing.model},
+                timeout=EXPERIMENT_SECONDS + 300,
+            )
+            with (folder / "supervisor.log").open("w") as log:
+                for line in process.stdout:
+                    log.write(line)
+                    log.flush()
+                    print(f"[{harness}] {line}", end="", flush=True)
+                log.write(process.stderr.read())
+            process.wait()
+        finally:
+            if collector:
+                collector.stop()
         if process.returncode:
             raise RuntimeError(f"Supervisor exited {process.returncode}")
         archive = folder / "capture.tar"
-        archive.write_bytes(sandbox.filesystem.read_bytes("/tmp/bench-result.tar"))
+        sandbox.filesystem.copy_to_local("/tmp/bench-result.tar", archive)
         unpack(archive, folder)
         archive.unlink()
         result = json.loads((folder / "capture/result.json").read_text())
@@ -164,12 +177,12 @@ def run(harness, batch, skip_evaluation=False):
                 pack.wait()
                 if pack.returncode == 0:
                     archive = folder / "recovery.tar"
-                    archive.write_bytes(
-                        sandbox.filesystem.read_bytes("/tmp/recovery.tar")
-                    )
+                    sandbox.filesystem.copy_to_local("/tmp/recovery.tar", archive)
             except Exception as recovery_error:
                 result["recovery_error"] = str(recovery_error)
     finally:
+        if collector:
+            result["live_collection"] = {"errors": collector.errors}
         if sandbox:
             sandbox.terminate()
         (folder / "result.json").write_text(json.dumps(result, indent=2))

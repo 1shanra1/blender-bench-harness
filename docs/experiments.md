@@ -5,10 +5,24 @@ Each selected harness gets a new Modal sandbox, its own credential Secret, the s
 Preview without creating sandboxes or calling models:
 
 ```sh
-uv run python scripts/run_experiment.py --harness codex cursor antigravity --dry-run
+uv run python scripts/launch_experiment.py --harness codex cursor antigravity --dry-run
 ```
 
-Remove `--dry-run` to run those harnesses concurrently. Select only the desired harness names; each invocation produces one independent run per selected harness. This consumes provider credits. Existing harness authentication and Modal setup are prerequisites; see [setup verification](pairing-verification.md).
+Deploy the controller once, and redeploy after changing its code or bundled runtime:
+
+```sh
+uv run modal deploy scripts/remote_experiment.py
+```
+
+Remove `--dry-run` to submit those harnesses concurrently. The launcher prints a batch ID and Modal function call ID, then exits; the remote controller continues after the laptop disconnects. Results stay in the `blender-bench-results` Modal Volume under `experiments/<batch-id>/`. Only the controller mounts that volume. Agents cannot browse it, and no experiment artifacts are automatically downloaded to the laptop.
+
+`batch.json` records collection progress and each harness outcome. Its `finished` status means the controller finished collecting, not that all models succeeded. The controller has a separate two-hour ceiling covering setup, the 75-minute agent deadline, and final rendering. Automatic function retries are disabled; an existing batch directory prevents repeating that batch.
+
+During execution, the controller collects log deltas and new saved checkpoint versions, waiting 120 seconds between completed passes, plus a final pass when the driver stops. Large files stream directly from the sandbox to the controller’s volume mount. Each pass commits the received data; no artifact data passes through the laptop. A crash can still lose unsaved work or files that have not finished copying and committing.
+
+The original `scripts/run_experiment.py` remains available for explicit local execution.
+
+Select only the desired harness names; each invocation produces one independent run per selected harness. This consumes provider credits. Existing harness authentication and Modal setup are prerequisites; see [setup verification](pairing-verification.md).
 
 ## Lifecycle
 
@@ -20,7 +34,7 @@ The supervisor starts the 75-minute clock when it launches the harness driver, i
 
 ## Outputs
 
-Each invocation writes a unique directory under ignored `outputs/experiments/`, with a subdirectory per harness:
+Each remote invocation writes a unique directory under `experiments/` on the results volume, with a subdirectory per harness (the legacy local runner uses ignored `outputs/experiments/`):
 
 - `manifest.json`, `prompt.md`: exact submitted prompt, input hashes, requested model/effort, versions, resources, and sandbox ID.
 - `capture/result.json`: native completion, deadline/exit information, and required artifact presence.
@@ -31,9 +45,10 @@ Each invocation writes a unique directory under ignored `outputs/experiments/`, 
 - `capture/*events.timestamps.jsonl`: receipt timestamps keyed by native event line number. These measure when the driver received a line, not when the provider generated it.
 - `capture/blender-mcp.log`: MCP server stderr, kept separate from protocol stdout.
 - `evaluation/`: independent renders and camera metadata. `evaluation.log` records renderer errors.
-- `result.json`: run outcome plus evaluation outcome.
+- `result.json`: run outcome plus evaluation outcome and live-collection error count.
+- `collection-errors.jsonl`: timestamped collection failures, also printed in controller logs. Collection retries on the next pass without prompting or stopping the agent.
 
-Capture samples saved files every two seconds, retains files stable during the read, and takes a final snapshot after Blender stops. It can miss rapid overwrites and cannot preserve unsaved Blender memory. It does not ask the agent to checkpoint or change its behavior. Final files remain final even if an earlier version looks better. Symlinks are excluded. Keep the local controller running through collection; a controller or sandbox failure can leave incomplete results. When possible, failed collection preserves a recovery archive.
+Capture samples saved files every two seconds, retains files stable during the read, and takes a final snapshot after Blender stops. It can miss rapid overwrites and cannot preserve unsaved Blender memory. It does not ask the agent to checkpoint or change its behavior. Final files remain final even if an earlier version looks better. Symlinks are excluded. The remote controller persists the batch summary at startup, commits received files during collection, and commits results after each harness finishes. It copies the existing checkpoint journals and verifies each new blob against its recorded SHA-256 before appending that journal row. Logs are copied by byte offset, preserving the raw stream even if a line is split across passes. On failure, already-collected versions and logs remain in `capture/`; they are not promoted to final artifacts or treated as a completed run. A controller or sandbox failure can still leave incomplete results. When possible, failed collection preserves a recovery archive.
 
 ## Independent views
 

@@ -9,7 +9,7 @@ from environment import BLENDER_VERSION, MCP_COMMIT, ROOT
 CPU = (4.0, 4.0)
 MEMORY_MIB = (8192, 8192)
 EXPERIMENT_SECONDS = 75 * 60
-REFERENCE = ROOT / "references/drill/reference-01.png"
+REFERENCE = ROOT / "references/skull/reference-01.png"
 PROMPT = ROOT / "prompts/reconstruction-draft.md"
 
 
@@ -25,7 +25,7 @@ def create_sandbox(image, secret, domains, timeout):
     )
 
 
-def prepare_workspace(sandbox):
+def prepare_workspace(sandbox, reference=None, prompt=None):
     process = sandbox.exec(
         "sh",
         "-c",
@@ -35,7 +35,8 @@ def prepare_workspace(sandbox):
     process.wait()
     if process.returncode:
         raise RuntimeError(process.stderr.read())
-    reference, prompt = REFERENCE.read_bytes(), PROMPT.read_bytes()
+    reference = REFERENCE.read_bytes() if reference is None else reference
+    prompt = PROMPT.read_bytes() if prompt is None else prompt
     sandbox.filesystem.write_bytes(reference, "/workspace/references/reference-01.png")
     sandbox.filesystem.write_bytes(prompt, "/workspace/task.md")
     process = sandbox.exec(
