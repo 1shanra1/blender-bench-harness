@@ -5,9 +5,9 @@ import hashlib
 import modal
 from environment import BLENDER_VERSION, MCP_COMMIT, ROOT
 
-# Fixed ceilings prevent one pairing from receiving extra burst capacity.
+# Keep CPU capacity equal; memory can grow beyond its reservation if available.
 CPU = (4.0, 4.0)
-MEMORY_MIB = (8192, 8192)
+MEMORY_MIB = 8192
 EXPERIMENT_SECONDS = 75 * 60
 REFERENCE = ROOT / "references/skull/reference-01.png"
 PROMPT = ROOT / "prompts/reconstruction-draft.md"
@@ -39,8 +39,11 @@ def prepare_workspace(sandbox, reference=None, prompt=None):
     prompt = PROMPT.read_bytes() if prompt is None else prompt
     sandbox.filesystem.write_bytes(reference, "/workspace/references/reference-01.png")
     sandbox.filesystem.write_bytes(prompt, "/workspace/task.md")
+    environment_note = (ROOT / "runtime/ENVIRONMENT.md").read_bytes()
+    sandbox.filesystem.write_bytes(environment_note, "/workspace/ENVIRONMENT.md")
     process = sandbox.exec(
-        "chmod", "444", "/workspace/references/reference-01.png", "/workspace/task.md"
+        "chmod", "444", "/workspace/references/reference-01.png", "/workspace/task.md",
+        "/workspace/ENVIRONMENT.md",
     )
     process.wait()
     if process.returncode:
@@ -49,6 +52,7 @@ def prepare_workspace(sandbox, reference=None, prompt=None):
     return {
         "cpu": CPU,
         "memory_mib": MEMORY_MIB,
+        "memory_limit_mib": None,
         "blender_version": BLENDER_VERSION,
         "mcp_commit": MCP_COMMIT,
         "display": "1280x800x24",
@@ -56,6 +60,7 @@ def prepare_workspace(sandbox, reference=None, prompt=None):
         "experiment_seconds": EXPERIMENT_SECONDS,
         "reference_sha256": hashlib.sha256(reference).hexdigest(),
         "prompt_sha256": hashlib.sha256(prompt).hexdigest(),
+        "environment_note_sha256": hashlib.sha256(environment_note).hexdigest(),
     }
 
 

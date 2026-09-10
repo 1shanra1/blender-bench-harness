@@ -7,7 +7,7 @@ Runs use native goal modes in isolated Modal sandboxes, with a 75-minute agent l
 ```sh
 uv sync
 uv run modal setup
-uv run python scripts/run_experiment.py --harness codex cursor antigravity --dry-run
+uv run python scripts/launch_experiment.py --harness codex cursor antigravity --dry-run
 ```
 
-Configure harness credentials before running. See [setup verification](docs/pairing-verification.md) and [running experiments](docs/experiments.md). Remove `--dry-run` to launch the selected pairings; runs consume provider credits. Results stay in ignored `outputs/` directories.
+Configure harness credentials before running. See [setup verification](docs/pairing-verification.md) and [running experiments](docs/experiments.md). Remove `--dry-run` to launch the selected pairings; runs consume provider credits. Results stay on a Modal Volume; download only the files you want.

@@ -24,6 +24,37 @@ The original `scripts/run_experiment.py` remains available for explicit local ex
 
 Select only the desired harness names; each invocation produces one independent run per selected harness. This consumes provider credits. Existing harness authentication and Modal setup are prerequisites; see [setup verification](pairing-verification.md).
 
+## Inspecting results
+
+List batches or browse a directory without downloading artifacts:
+
+```sh
+uv run python scripts/results.py files
+uv run python scripts/results.py files experiments/<batch>/codex/capture/artifacts
+```
+
+Inspect saved outcomes and, for unfinished runs, query the agent sandbox's state:
+
+```sh
+uv run python scripts/results.py status <batch>
+```
+
+The command labels the controller state as the **last saved** status; it can be stale if the controller crashed. An exited sandbox is not proof of successful model completion. Collection and independent rendering may still be in progress; native outcomes appear in the saved results.
+
+Download exactly one chosen file to an explicit local destination:
+
+```sh
+uv run python scripts/results.py get experiments/<batch>/codex/capture/artifacts/render.png /tmp/codex-render.png
+```
+
+Existing destination files are not overwritten. These commands use the local Modal login; no additional service or agent-side volume access is needed.
+
+## Shared environment
+
+Agent sandboxes reserve 8 GiB of RAM without an explicit hard memory ceiling. They can use additional memory when the host has capacity; this does not guarantee unlimited memory or eliminate OOM failures. CPU remains fixed at four cores. Independent rendering uses the same memory reservation. Modal bills the greater of reserved and actual memory use; see [resource configuration](https://modal.com/docs/guide/resources).
+
+The common image includes image/video tools, numerical and geometry Python libraries, standard shell utilities, process inspection tools, and a C/C++ toolchain. The exact tool list and the distinction between shell Python and Blender Python are documented in [`runtime/ENVIRONMENT.md`](../runtime/ENVIRONMENT.md). Each workspace receives that file, and the prompt points to it. The run folder preserves a copy and its hash is recorded in the manifest. Provider-only network restrictions and the prohibition on external assets remain in effect.
+
 ## Lifecycle
 
 Cursor CLI 2026.09.02-c22c1a3 is patched at image build time to give MCP tool calls a 600-second timeout. `runtime/patch_cursor_timeout.py` checks the original bundle hash and changes only the SDK call's timeout option. Run manifests identify this as `mcp-tool-timeout-600s-v1`; native goal behavior is unchanged. The first drill batch predates this patch.

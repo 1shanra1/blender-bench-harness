@@ -14,6 +14,8 @@ Save your work to `/workspace/output/scene.blend` as you progress and before fin
 
 ## Shared environment note
 
+Read `/workspace/ENVIRONMENT.md` for the installed image, geometry, numerical, and shell tools, and how shell Python differs from Blender Python.
+
 Put all reconstructed object parts in a collection named `Reconstruction`. Keep any presentation geometry outside that collection so independent inspection renders can frame the object from different angles.
 
 Save Python scripts that Blender needs to execute in `/workspace/scripts`, which is accessible to both the CLI and Blender in this run. Keep those files readable by the `blender` user; private harness folders under `/root` are not accessible to Blender.

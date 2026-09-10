@@ -27,5 +27,15 @@ blender_image = (
     # The official server imports FastMCP, which was removed in MCP SDK 2.x.
     .uv_pip_install("/opt/blender-mcp/mcp", "mcp[cli]<2")
     .env({"BLENDER_USER_SCRIPTS": "/opt/blender-user", "LIBGL_ALWAYS_SOFTWARE": "1"})
+    # General tools shared by every harness; install before network restrictions.
+    .apt_install(
+        "bash", "coreutils", "findutils", "grep", "sed", "gawk", "jq", "ripgrep",
+        "file", "zip", "unzip", "imagemagick", "ffmpeg",
+        "procps", "psmisc", "lsof", "time", "build-essential", "pkg-config",
+    )
+    .uv_pip_install(
+        "uv", "pillow", "numpy", "scipy", "sympy", "matplotlib",
+        "opencv-python-headless", "scikit-image", "trimesh", "shapely",
+        "rtree", "networkx", "manifold3d",
+    )
 )
-

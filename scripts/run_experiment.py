@@ -16,6 +16,7 @@ from environment import ROOT, blender_image
 from live_collection import LiveCollector
 from shared_sandbox import (
     EXPERIMENT_SECONDS,
+    MEMORY_MIB,
     PROMPT,
     create_sandbox,
     prepare_workspace,
@@ -51,7 +52,7 @@ def evaluate(folder, exclude_objects=()):
         image=blender_image.add_local_dir(ROOT / "runtime", remote_path="/opt/bench"),
         block_network=True,
         cpu=(4.0, 4.0),
-        memory=(8192, 8192),
+        memory=MEMORY_MIB,
         timeout=600,
     )
     try:
@@ -134,6 +135,7 @@ def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, c
         )
         if commit:
             commit()
+        (folder / "ENVIRONMENT.md").write_bytes((ROOT / "runtime/ENVIRONMENT.md").read_bytes())
         start_blender(sandbox)
         if commit:
             collector = LiveCollector(sandbox, folder, harness, commit)
