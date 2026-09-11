@@ -27,18 +27,17 @@ export default function Backdrop() {
         scale={0.3}
         offsetX={0.25}
         offsetY={0.4}
-        softness={0.85}
-        intensity={0.15}
-        noise={0.12}
+        softness={0.82}
+        intensity={0.32}
+        noise={0.1}
         shape="wave"
         frame={20729}
-        colors={["#7300FF", "#EBA8FF", "#00BFFF", "#22112244"]}
+        colors={["#f87171", "#b91c1c", "#2563eb", "#38bdf8"]}
         colorBack="#00000000"
         maxPixelCount={240000}
         style={{
           width: "100%",
           height: "100%",
-          filter: "grayscale(100%) brightness(12%)",
           opacity: 0.65,
         }}
       />
