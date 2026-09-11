@@ -43,11 +43,17 @@ def make_handler(archive):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 if not head:
-                    self.wfile.write(body)
+                    try:
+                        self.wfile.write(body)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
                 return
             if path.startswith("/api/images/"):
                 with lock:
-                    file = archive.image_path(path.removeprefix("/api/images/"))
+                    file = archive.asset_path(path.removeprefix("/api/images/"))
+            elif path.startswith("/api/models/"):
+                with lock:
+                    file = archive.asset_path(path.removeprefix("/api/models/"))
             else:
                 base = archive.root / "frontend/dist"
                 file = base / ("index.html" if path == "/" else unquote(path).lstrip("/"))
@@ -62,11 +68,16 @@ def make_handler(archive):
                 self.send_error(404)
                 return
             with source:
+                content_type = mimetypes.guess_type(file.name)[0]
+                if file.suffix.lower() == ".glb":
+                    content_type = "model/gltf-binary"
+                elif file.suffix.lower() == ".gltf":
+                    content_type = "model/gltf+json"
                 self.send_response(200)
-                self.send_header("Content-Type", mimetypes.guess_type(file.name)[0] or "application/octet-stream")
+                self.send_header("Content-Type", content_type or "application/octet-stream")
                 self.send_header("Content-Length", str(os.fstat(source.fileno()).st_size))
                 self.send_header("X-Content-Type-Options", "nosniff")
-                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
                 self.end_headers()
                 if not head:
                     try:

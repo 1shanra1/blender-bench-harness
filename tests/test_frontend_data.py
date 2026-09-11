@@ -68,6 +68,16 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(run["status"], "time_limit")
         self.assertIsNone(run["native_complete"])
 
+    def test_indexes_glb_model(self):
+        folder = self.run_folder()
+        glb = folder / "evaluation/scene.glb"
+        glb.parent.mkdir(parents=True, exist_ok=True)
+        glb.write_bytes(b"test glb binary data")
+        run = self.archive.catalogue()["experiments"][0]["runs"][0]
+        self.assertTrue(run["model_url"].startswith("/api/models/"))
+        key = run["model_url"].split("/")[-1]
+        self.assertEqual(self.archive.asset_path(key), glb)
+
     def test_symlinked_asset_and_parent_are_rejected(self):
         folder = self.run_folder()
         image = folder / "capture/artifacts/render.png"

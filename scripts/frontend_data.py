@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HARNESSES = ("codex", "cursor", "antigravity")
 VIEWS = ("positive_x", "negative_x", "positive_y", "negative_y", "positive_z", "negative_z")
 IMAGE_TYPES = {".png", ".jpg", ".jpeg", ".webp"}
+MODEL_TYPES = {".glb", ".gltf"}
 
 
 def is_local_file(path, base):
@@ -85,12 +86,15 @@ class LocalArchive:
         reference_root = self.root / "references"
         assets = {}
 
-        def asset(path, base):
-            if path is None or path.suffix.lower() not in IMAGE_TYPES or not is_local_file(path, base):
+        def asset(path, base, allowed_types=IMAGE_TYPES):
+            if path is None or path.suffix.lower() not in allowed_types or not is_local_file(path, base):
                 return None
-            key = hashlib.sha256(str(path.relative_to(self.root)).encode()).hexdigest()[:24]
+            # Include file modification time in the asset key to ensure instant cache invalidation on edits
+            mtime = int(path.stat().st_mtime) if path.is_file() else 0
+            key = hashlib.sha256(f"{path.relative_to(self.root)}:{mtime}".encode()).hexdigest()[:24]
             assets[key] = (path, base)
-            return f"/api/images/{key}"
+            prefix = "models" if path.suffix.lower() in MODEL_TYPES else "images"
+            return f"/api/{prefix}/{key}"
 
         references = {}
         if reference_root.is_dir() and not reference_root.is_symlink():
@@ -120,6 +124,9 @@ class LocalArchive:
                 reference = references.get(reference_hash) or reference
                 events = folder / "capture" / {"codex": "codex-events.jsonl", "cursor": "cursor-events.jsonl", "antigravity": "agy-events.jsonl"}[harness]
                 usage = reported_usage(events, harness) if is_local_file(events, experiments_root) else None
+                glb_candidate = folder / "evaluation/scene.glb"
+                if not is_local_file(glb_candidate, experiments_root):
+                    glb_candidate = folder / "capture/artifacts/scene.glb"
                 runs.append({
                     "id": harness,
                     "name": {"codex": "Codex", "cursor": "Cursor", "antigravity": "Antigravity"}[harness],
@@ -131,6 +138,7 @@ class LocalArchive:
                     "native_complete": (result.get("native") or {}).get("complete"),
                     "elapsed_seconds": number(result.get("elapsed_seconds")),
                     "limit_seconds": number(result.get("limit_seconds", manifest.get("experiment_seconds"))),
+                    "model_url": asset(glb_candidate, experiments_root, allowed_types=MODEL_TYPES),
                     "render": asset(folder / "capture/artifacts/render.png", experiments_root),
                     "views": {view: asset(folder / "evaluation" / f"{view}.png", experiments_root) for view in VIEWS},
                     "evaluation_status": (result.get("evaluation") or {}).get("status", "unavailable"),
@@ -159,6 +167,9 @@ class LocalArchive:
         self.assets = assets
         return {"experiments": experiments}
 
-    def image_path(self, key):
+    def asset_path(self, key):
         entry = self.assets.get(key)
         return entry[0] if entry and is_local_file(*entry) else None
+
+    def image_path(self, key):
+        return self.asset_path(key)

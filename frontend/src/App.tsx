@@ -9,8 +9,9 @@ import {
 } from "lucide-react"
 import Lightbox from "yet-another-react-lightbox"
 import Captions from "yet-another-react-lightbox/plugins/captions"
-import { Metrics } from "@/components/metrics"
 import Zoom from "yet-another-react-lightbox/plugins/zoom"
+import { Metrics } from "@/components/metrics"
+import { ModelViewer } from "@/components/model-viewer"
 import { Button } from "@/components/ui/button"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import {
@@ -20,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Empty,
@@ -30,13 +30,11 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import {
-  axes,
   duration,
   modelName,
   pairColors,
   pairLetters,
   runStatus,
-  type Axis,
   type Experiment,
 } from "@/lib/experiments"
 
@@ -46,15 +44,21 @@ function ImageFrame({
   src,
   label,
   onOpen,
+  ratio = 1.33,
+  className,
+  onDimensions,
 }: {
   src: string | null
   label: string
   onOpen: () => void
+  ratio?: number
+  className?: string
+  onDimensions?: (width: number, height: number) => void
 }) {
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
   return (
-    <AspectRatio ratio={1.42} className="image-frame">
+    <AspectRatio ratio={ratio} className="image-frame">
       {src && !failed ? (
         <button
           className="image-button"
@@ -65,7 +69,16 @@ function ImageFrame({
           <img
             src={src}
             alt={label}
-            onLoad={() => setLoaded(true)}
+            className={className}
+            onLoad={(e) => {
+              setLoaded(true)
+              if (onDimensions) {
+                onDimensions(
+                  e.currentTarget.naturalWidth,
+                  e.currentTarget.naturalHeight
+                )
+              }
+            }}
             onError={() => setFailed(true)}
           />
           <span className="enlarge-icon" aria-hidden="true">
@@ -87,14 +100,13 @@ function ImageFrame({
 }
 
 function Comparison({ experiment }: { experiment: Experiment }) {
-  const [mode, setMode] = useState("agent")
-  const [axis, setAxis] = useState<Axis>("positive_y")
   const [lightbox, setLightbox] = useState(-1)
+  const [aspectRatio, setAspectRatio] = useState(1.33)
   const images = [
     { src: experiment.reference, alt: `${experiment.name} — reference image` },
     ...experiment.runs.map((run) => ({
-      src: mode === "agent" ? run.render : run.views[axis],
-      alt: `${experiment.name} — ${modelName(run.model)} · ${run.name}${mode === "views" ? ` · ${axes.find(([key]) => key === axis)?.[1]}` : ""}`,
+      src: run.render,
+      alt: `${experiment.name} — ${modelName(run.model)} · ${run.name}`,
     })),
   ]
   const slides = images.filter(
@@ -104,46 +116,8 @@ function Comparison({ experiment }: { experiment: Experiment }) {
     setLightbox(slides.findIndex((item) => item.src === src))
   return (
     <>
-      <Tabs
-        value={mode}
-        onValueChange={(value) => {
-          setMode(String(value))
-          setLightbox(-1)
-        }}
-        className="comparison"
-      >
-        <div className="comparison-toolbar">
-          <TabsList aria-label="Render source">
-            <TabsTrigger value="agent" className="px-3">
-              Agent render
-            </TabsTrigger>
-            <TabsTrigger value="views" className="px-3">
-              Independent views
-            </TabsTrigger>
-          </TabsList>
-          {mode === "views" && (
-            <Select
-              value={axis}
-              onValueChange={(value) => {
-                if (value) setAxis(value as Axis)
-              }}
-              items={axes.map(([value, label]) => ({ value, label }))}
-            >
-              <SelectTrigger aria-label="Camera axis" className="axis-select">
-                <Box size={14} />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {axes.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <TabsContent value={mode} className="comparison-grid">
+      <div className="comparison">
+        <div className="comparison-grid">
           <div className="comparison-column">
             <article className="render-card">
               <header className="render-header reference-header">
@@ -153,11 +127,16 @@ function Comparison({ experiment }: { experiment: Experiment }) {
                 key={images[0].src}
                 src={images[0].src}
                 label={images[0].alt}
+                className="reference-img"
+                ratio={aspectRatio}
+                onDimensions={(w, h) => {
+                  if (w && h) setAspectRatio(w / h)
+                }}
                 onOpen={() => openImage(images[0].src)}
               />
             </article>
           </div>
-          {experiment.runs.map((run, i) => (
+          {experiment.runs.map((run) => (
             <div key={run.id} className="comparison-column">
               <article className="render-card">
                 <header className="render-header">
@@ -177,11 +156,13 @@ function Comparison({ experiment }: { experiment: Experiment }) {
                     </p>
                   </div>
                 </header>
-                <ImageFrame
-                  key={images[i + 1].src ?? `${run.id}-${mode}-${axis}`}
-                  src={images[i + 1].src}
-                  label={images[i + 1].alt}
-                  onOpen={() => openImage(images[i + 1].src)}
+                <ModelViewer
+                  key={run.id}
+                  modelUrl={run.model_url}
+                  renderUrl={run.render}
+                  label={`${modelName(run.model)} · ${run.name}`}
+                  ratio={aspectRatio}
+                  onOpenRender={() => openImage(run.render)}
                 />
               </article>
               <div className="render-meta">
@@ -201,8 +182,8 @@ function Comparison({ experiment }: { experiment: Experiment }) {
               </div>
             </div>
           ))}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
       <Metrics runs={experiment.runs} />
       <Lightbox
         open={lightbox >= 0}

@@ -22,6 +22,7 @@ export type Run = {
   effort: string | null
   status: string
   native_complete: boolean | null
+  model_url: string | null
   render: string | null
   views: Record<Axis, string | null>
   evaluation_status: string
