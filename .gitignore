@@ -17,6 +17,9 @@ venv/
 __pycache__/
 *.py[cod]
 .DS_Store
+node_modules/
+frontend/dist/
+*.tsbuildinfo
 
 # Private inputs and generated experiment artifacts
 references/

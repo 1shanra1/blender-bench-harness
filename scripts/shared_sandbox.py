@@ -9,7 +9,7 @@ from environment import BLENDER_VERSION, MCP_COMMIT, ROOT
 CPU = (4.0, 4.0)
 MEMORY_MIB = 8192
 EXPERIMENT_SECONDS = 75 * 60
-REFERENCE = ROOT / "references/skull/reference-01.png"
+REFERENCE = ROOT / "references/kettle/reference-01.png"
 PROMPT = ROOT / "prompts/reconstruction-draft.md"
 
 
