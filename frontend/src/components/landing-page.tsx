@@ -1,5 +1,4 @@
-import { lazy, Suspense } from "react"
-import { ArrowRight } from "lucide-react"
+import { lazy, Suspense, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { type Experiment } from "@/lib/experiments"
 
@@ -9,10 +8,26 @@ export function LandingPage({ experiment, onBrowse }: {
   experiment?: Experiment
   onBrowse: () => void
 }) {
+  const [readyExperiment, setReadyExperiment] = useState<Experiment | null>(null)
+  useEffect(() => {
+    if (!experiment) return
+    let cancelled = false
+    const sources = [experiment.reference, ...experiment.runs.map((run) => run.render)]
+    Promise.all(sources.map(async (src) => {
+      if (!src) return
+      const image = new Image()
+      image.src = src
+      await image.decode().catch(() => undefined)
+    })).then(() => {
+      if (!cancelled) setReadyExperiment(experiment)
+    })
+    return () => { cancelled = true }
+  }, [experiment])
+  const previewsReady = Boolean(experiment && readyExperiment === experiment)
   const previews = experiment ? [
     { label: "Reference", src: experiment.reference },
     ...experiment.runs.map((run) => ({ label: run.name, src: run.render })),
-  ] : []
+  ] : ["Reference", "Codex", "Kimi Code", "Claude Code"].map((label) => ({ label, src: null }))
 
   return (
     <main className="landing-page">
@@ -59,19 +74,17 @@ export function LandingPage({ experiment, onBrowse }: {
           </p>
         </div>
       </section>
-      {previews.length > 0 && (
-        <section className="landing-preview" aria-label="Desk Lamp reconstructed with Gemini 3.8 Flash High">
+      <section className={`landing-preview ${previewsReady ? "is-ready" : ""}`} aria-busy={!previewsReady} aria-label="Desk Lamp reconstructed with Gemini 3.8 Flash High">
           {previews.map((preview) => (
-            <figure key={preview.label}>
+            <figure key={preview.label} style={{ visibility: previewsReady ? "visible" : "hidden" }}>
               <div>{preview.src && <img src={preview.src} alt={`Desk Lamp — ${preview.label}`} />}</div>
               <figcaption>{preview.label}</figcaption>
             </figure>
           ))}
         </section>
-      )}
       <div className="landing-actions">
         <Button className="landing-cta" onClick={onBrowse}>
-          View experiments <ArrowRight size={16} aria-hidden="true" />
+          View experiments
         </Button>
 
       </div>

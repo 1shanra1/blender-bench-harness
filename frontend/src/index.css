@@ -205,8 +205,8 @@ h1 {
 }
 .experiment-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 340px));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 260px));
+  gap: 20px;
 }
 .experiment-card {
   overflow: hidden;
@@ -240,7 +240,7 @@ h1 {
 }
 .experiment-card h2 {
   margin: 0;
-  padding: 18px 20px;
+  padding: 14px 16px;
   font-size: 14px;
   font-weight: 550;
 }
@@ -523,7 +523,7 @@ h1 {
     margin-top: 0;
   }
   .experiment-gallery {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 260px);
   }
   .experiment-select {
     width: 100%;
@@ -552,7 +552,6 @@ h1 {
   position: absolute;
   z-index: 0;
   inset: 0 -40px;
-  max-width: 900px;
   pointer-events: none;
   overflow: hidden;
   mask-image: linear-gradient(
@@ -746,7 +745,8 @@ h1 {
 .inspection-header {
   height: 52px;
   padding: 0 16px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -766,26 +766,18 @@ h1 {
   margin: 0;
   letter-spacing: -0.15px;
   white-space: nowrap;
-}
-.inspection-header-info p {
-  color: #a0a2a9;
-  font-size: 10px;
-  margin: 2px 0 0;
-  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .inspection-switcher {
   display: flex;
   align-items: center;
   gap: 3px;
-  background: #17181c;
-  border: 1px solid #28292d;
-  border-radius: 6px;
-  padding: 3px;
 }
 .inspection-tab {
   display: inline-flex;
   align-items: center;
-  height: 26px;
+  height: 32px;
   padding: 0 10px;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -793,7 +785,7 @@ h1 {
   color: #a0a2a9;
   font-size: 11px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: color 120ms ease, background-color 120ms ease;
 }
 .inspection-tab:hover {
   color: #f3f3f1;
@@ -802,30 +794,29 @@ h1 {
 .inspection-tab.active {
   color: #f3f3f1;
   background: #28292e;
-  border-color: #383a41;
 }
 .inspection-header-actions {
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 .inspection-close-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border-radius: 5px;
-  border: 1px solid #28292d;
-  background: #17181c;
+  border: 0;
+  background: transparent;
   color: #a0a2a9;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: color 120ms ease, background-color 120ms ease;
 }
 .inspection-close-btn:hover {
   color: #f3f3f1;
   background: #24262b;
-  border-color: #383a41;
 }
 .inspection-body {
   flex: 1;
@@ -843,18 +834,14 @@ h1 {
   width: 170px;
   background: rgba(17, 18, 20, 0.88);
   backdrop-filter: blur(8px);
-  border: 1px solid #28292d;
   border-radius: 7px;
   overflow: hidden;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
 }
 .inspection-floating-reference-header {
   padding: 5px 8px;
   font-size: 10px;
   color: #85878f;
   font-weight: 500;
-  border-bottom: 1px solid #222328;
-  background: rgba(14, 15, 17, 0.6);
 }
 .inspection-floating-reference img {
   display: block;
@@ -862,7 +849,7 @@ h1 {
   height: auto;
   max-height: 140px;
   object-fit: contain;
-  background: #0d0e10;
+  background: #fff;
   cursor: pointer;
 }
 .inspection-viewport-wrap {
@@ -871,17 +858,31 @@ h1 {
   height: 100%;
   position: relative;
 }
+.model-loading {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
+  color: #a0a2a9;
+  font-size: 11px;
+  pointer-events: none;
+}
 @media (max-width: 768px) {
   .inspection-header {
     height: auto;
     padding: 10px 14px;
-    flex-wrap: wrap;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
   .inspection-switcher {
-    order: 3;
+    grid-row: 2;
+    grid-column: 1 / -1;
     width: 100%;
     justify-content: center;
+  }
+  .inspection-header-actions {
+    grid-row: 1;
+    grid-column: 2;
   }
   .inspection-floating-reference {
     width: 120px;
@@ -905,14 +906,13 @@ h1 {
   height: 36px;
   flex-shrink: 0;
   padding: 0;
-  border: 1px solid #28292d;
-  border-radius: 8px;
-  background: #0e0f11;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: #92949c;
   cursor: pointer;
 }
 .back-to-experiments:hover {
-  background: #191a1e;
   color: #f3f3f1;
 }
 
@@ -926,6 +926,7 @@ h1 {
   position: relative;
 }
 .landing-intro .shader-backdrop {
+  max-width: 900px;
   inset-block: -64px -32px;
   opacity: 1;
   mask-image:
@@ -992,10 +993,15 @@ h1 {
   color: #f3f3f1;
 }
 .landing-preview {
+  opacity: 0;
+  transition: opacity 180ms ease;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-top: 64px;
+}
+.landing-preview.is-ready {
+  opacity: 1;
 }
 .landing-preview figure {
   margin: 0;
@@ -1036,4 +1042,62 @@ h1 {
   gap: 6px;
   margin: 0;
   line-height: 24px;
+}
+
+.experiment-title-select[data-slot="select-trigger"] {
+  height: auto;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  gap: 8px;
+}
+.experiment-title-select[data-slot="select-trigger"] svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.65;
+}
+.experiment-title-select[data-slot="select-trigger"]:hover {
+  background: transparent;
+  color: #d0d2d8;
+}
+.experiment-menu[data-slot="select-content"] {
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  max-height: min(320px, var(--available-height, 320px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: normal;
+  font-weight: 400;
+}
+.experiment-menu [data-slot="select-item"] {
+  min-height: 38px;
+  font-size: 14px;
+}
+.experiment-menu [data-slot="select-item"] > span:first-child {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.experiment-menu [data-slot="select-label"] {
+  padding: 8px 6px;
+  font-size: 11px;
+}
+.comparison-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.comparison-toolbar .model-tabs { margin: 0; }
+.inspect-models { flex-shrink: 0; }
+.comparison .render-header { height: 60px; padding-block: 16px; }
+@media (max-width: 560px) {
+  .comparison-toolbar { flex-wrap: wrap; }
+  .comparison-toolbar .model-tabs { flex-direction: row; flex-wrap: wrap; }
 }

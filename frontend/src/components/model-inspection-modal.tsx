@@ -71,10 +71,7 @@ export function ModelInspectionModal({
     >
       <header className="inspection-header">
         <div className="inspection-header-info">
-          <div>
-            <h2>{modelName(activeRun.model)}</h2>
-            <p>{activeRun.name}</p>
-          </div>
+          <h2>{modelName(activeRun.model)}</h2>
         </div>
 
         <div
@@ -129,7 +126,6 @@ export function ModelInspectionModal({
 
         <div className="inspection-viewport-wrap">
           <ModelViewer
-            key={activeRun.id}
             modelUrl={activeRun.model_url}
             renderUrl={activeRun.render}
             label={`${modelName(activeRun.model)} · ${activeRun.name}`}

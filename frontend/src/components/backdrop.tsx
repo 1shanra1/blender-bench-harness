@@ -1,29 +1,11 @@
-import { useSyncExternalStore } from "react"
+import { memo } from "react"
 import { GrainGradient } from "@paper-design/shaders-react"
 
-const query = "(prefers-reduced-motion: reduce)"
-function subscribe(callback: () => void) {
-  const media = window.matchMedia(query)
-  media.addEventListener("change", callback)
-  document.addEventListener("visibilitychange", callback)
-  return () => {
-    media.removeEventListener("change", callback)
-    document.removeEventListener("visibilitychange", callback)
-  }
-}
-
-export default function Backdrop() {
-  const animate = useSyncExternalStore(
-    subscribe,
-    () =>
-      !window.matchMedia(query).matches &&
-      document.visibilityState === "visible",
-    () => false
-  )
+export default memo(function Backdrop() {
   return (
     <div className="shader-backdrop" aria-hidden="true">
       <GrainGradient
-        speed={animate ? 0.08 : 0}
+        speed={0}
         scale={0.3}
         offsetX={0.25}
         offsetY={0.4}
@@ -43,4 +25,4 @@ export default function Backdrop() {
       />
     </div>
   )
-}
+})

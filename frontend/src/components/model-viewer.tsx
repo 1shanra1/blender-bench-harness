@@ -5,9 +5,24 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { Box, Image as ImageIcon, RotateCcw } from "lucide-react"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
+
+function disposeModel(model: THREE.Object3D) {
+  const textures = new Set<THREE.Texture>()
+  model.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return
+    object.geometry.dispose()
+    const materials = Array.isArray(object.material) ? object.material : [object.material]
+    for (const material of materials) {
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture) textures.add(value)
+      }
+      material.dispose()
+    }
+  })
+  textures.forEach((texture) => texture.dispose())
+}
 
 export function ModelViewer({
   modelUrl,
@@ -38,9 +53,17 @@ export function ModelViewer({
   const initialTarget = useRef<THREE.Vector3>(new THREE.Vector3())
   const modelRadiusRef = useRef<number>(1)
   const requestRef = useRef<number>(0)
+  const runtimeRef = useRef<{
+    scene: THREE.Scene
+    renderer: THREE.WebGLRenderer
+    camera: THREE.PerspectiveCamera
+    controls: OrbitControls
+    model: THREE.Object3D | null
+  } | null>(null)
+  const showingModel = Boolean(modelUrl && !showRender && !error)
 
   useEffect(() => {
-    if (!modelUrl || showRender) {
+    if (!showingModel) {
       return
     }
 
@@ -92,6 +115,51 @@ export function ModelViewer({
     room.dispose()
     pmrem.dispose()
 
+    const runtime = { scene, renderer, camera, controls, model: null as THREE.Object3D | null }
+    runtimeRef.current = runtime
+
+    // Render loop
+    const animate = () => {
+      requestRef.current = requestAnimationFrame(animate)
+      controls.update()
+      renderer.render(scene, camera)
+    }
+    requestRef.current = requestAnimationFrame(animate)
+
+    // Resize handling
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width
+        const h = entry.contentRect.height
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h
+          camera.updateProjectionMatrix()
+          renderer.setSize(w, h)
+        }
+      }
+    })
+    resizeObserver.observe(container)
+
+    return () => {
+      runtimeRef.current = null
+      if (runtime.model) disposeModel(runtime.model)
+      cancelAnimationFrame(requestRef.current)
+      resizeObserver.disconnect()
+      controls.dispose()
+      environment.dispose()
+      renderer.dispose()
+      scene.clear()
+      if (container.contains(canvas)) {
+        container.removeChild(canvas)
+      }
+    }
+  }, [showingModel])
+
+  useEffect(() => {
+    const runtime = runtimeRef.current
+    if (!modelUrl || !showingModel || !runtime) return
+    const { scene, renderer, camera, controls } = runtime
+
     // Load Model
     const loader = new GLTFLoader()
     let disposed = false
@@ -99,7 +167,10 @@ export function ModelViewer({
     loader.load(
       modelUrl,
       (gltf) => {
-        if (disposed) return
+        if (disposed) {
+          disposeModel(gltf.scene)
+          return
+        }
         const model = gltf.scene
 
         // Some Blender exports retain anisotropy without tangents or UVs.
@@ -129,7 +200,10 @@ export function ModelViewer({
         model.position.x = -center.x
         model.position.y = -center.y
         model.position.z = -center.z
+        const previousModel = runtime.model
+        if (previousModel) scene.remove(previousModel)
         scene.add(model)
+        runtime.model = model
 
         // Position camera to fit object cleanly in view
         const fov = camera.fov * (Math.PI / 180)
@@ -149,6 +223,9 @@ export function ModelViewer({
         initialCamPos.current.copy(camPos)
         initialTarget.current.set(0, 0, 0)
 
+        // Paint the replacement before publishing its loaded state.
+        renderer.render(scene, camera)
+        if (previousModel) disposeModel(previousModel)
         setLoadedUrl(modelUrl)
       },
       undefined,
@@ -159,41 +236,8 @@ export function ModelViewer({
       }
     )
 
-    // Render loop
-    const animate = () => {
-      requestRef.current = requestAnimationFrame(animate)
-      controls.update()
-      renderer.render(scene, camera)
-    }
-    requestRef.current = requestAnimationFrame(animate)
-
-    // Resize handling
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width
-        const h = entry.contentRect.height
-        if (w > 0 && h > 0) {
-          camera.aspect = w / h
-          camera.updateProjectionMatrix()
-          renderer.setSize(w, h)
-        }
-      }
-    })
-    resizeObserver.observe(container)
-
-    return () => {
-      disposed = true
-      cancelAnimationFrame(requestRef.current)
-      resizeObserver.disconnect()
-      controls.dispose()
-      environment.dispose()
-      renderer.dispose()
-      scene.clear()
-      if (container.contains(canvas)) {
-        container.removeChild(canvas)
-      }
-    }
-  }, [modelUrl, showRender])
+    return () => { disposed = true }
+  }, [modelUrl, showingModel])
 
   // Reset to original isometric camera view
   const resetCamera = useCallback(() => {
@@ -212,7 +256,7 @@ export function ModelViewer({
       {modelUrl && !error && !showRender ? (
         <div className="relative w-full h-full">
           {loading && (
-            <Skeleton className="absolute inset-0 rounded-none z-10" />
+            <div className="model-loading" role="status">Loading model…</div>
           )}
           <div
             ref={containerRef}

@@ -1,5 +1,20 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, Box, CircleAlert, ImageOff, Maximize2, RotateCw } from "lucide-react"
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
+import {
+  ArrowLeft,
+  Box,
+  CircleAlert,
+  ImageOff,
+  Maximize2,
+  RotateCw,
+} from "lucide-react"
 import Lightbox from "yet-another-react-lightbox"
 import Captions from "yet-another-react-lightbox/plugins/captions"
 import Zoom from "yet-another-react-lightbox/plugins/zoom"
@@ -11,7 +26,9 @@ import { AspectRatio } from "@/components/ui/aspect-ratio"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
@@ -82,13 +99,20 @@ function ImageFrame({
   )
 }
 
-function Comparison({ experiment }: { experiment: Experiment }) {
+function Comparison({
+  experiment,
+  modelTabs,
+}: {
+  experiment: Experiment
+  modelTabs: ReactNode
+}) {
   const [lightbox, setLightbox] = useState(-1)
   const [inspectingRunId, setInspectingRunId] = useState<string | null>(null)
   useEffect(() => {
     setLightbox(-1)
     setInspectingRunId(null)
   }, [experiment.id])
+  const firstModel = experiment.runs.find((run) => run.model_url)
   const images = [
     { src: experiment.reference, alt: `${experiment.name} — reference image` },
     ...experiment.runs.map((run) => ({
@@ -103,12 +127,24 @@ function Comparison({ experiment }: { experiment: Experiment }) {
     setLightbox(slides.findIndex((item) => item.src === src))
   return (
     <>
+      <div className="comparison-toolbar">
+        {modelTabs}
+        {firstModel && (
+          <Button
+            variant="outline"
+            className="inspect-models"
+            onClick={() => setInspectingRunId(firstModel.id)}
+          >
+            <Box size={16} aria-hidden="true" /> Inspect in 3D
+          </Button>
+        )}
+      </div>
       <div className="comparison">
         <div className="comparison-grid">
           <div className="comparison-column">
             <article className="render-card">
               <header className="render-header reference-header">
-                <h2>Reference image</h2>
+                <h2>Reference</h2>
               </header>
               <ImageFrame
                 src={images[0].src}
@@ -122,28 +158,13 @@ function Comparison({ experiment }: { experiment: Experiment }) {
             <div key={run.id} className="comparison-column">
               <article className="render-card">
                 <header className="render-header">
-                  <div>
-                    <h2>{modelName(run.model)}</h2>
-                    <p>{run.name}</p>
-                  </div>
-                  {run.model_url && (
-                    <button
-                      type="button"
-                      className="card-3d-btn"
-                      onClick={() => setInspectingRunId(run.id)}
-                      aria-label={`Open 3D model for ${run.name}`}
-                      title="Open 3D model"
-                    >
-                      <Box size={12} />
-                      <span>3D Model</span>
-                    </button>
-                  )}
+                  <h2>{run.name}</h2>
                 </header>
                 <ImageFrame
                   key={run.id}
                   src={run.render}
                   label={`${modelName(run.model)} · ${run.name}`}
-                    onOpen={() => openImage(run.render)}
+                  onOpen={() => openImage(run.render)}
                 />
               </article>
             </div>
@@ -267,18 +288,25 @@ export default function App() {
     : (availableModels[0] ?? location.model)
   const experiment = group?.variants[selectedModel]
 
-  const navigate = async (experimentId: string | null, model = selectedModel, view = "experiments") => {
+  const navigate = async (
+    experimentId: string | null,
+    model = selectedModel,
+    view = "experiments"
+  ) => {
     const request = ++navigationRequest.current
     const target = groups.find((item) => item.id === experimentId)
-    const batch = target?.variants[model] ?? Object.values(target?.variants ?? {})[0]
+    const batch =
+      target?.variants[model] ?? Object.values(target?.variants ?? {})[0]
     if (batch) {
       // Keep the current comparison visible until the next images are decoded.
       const sources = [batch.reference, ...batch.runs.map((run) => run.render)]
-      await Promise.all(sources.filter(Boolean).map(async (src) => {
-        const image = new Image()
-        image.src = src!
-        await image.decode().catch(() => undefined)
-      }))
+      await Promise.all(
+        sources.filter(Boolean).map(async (src) => {
+          const image = new Image()
+          image.src = src!
+          await image.decode().catch(() => undefined)
+        })
+      )
     }
     if (request !== navigationRequest.current) return
 
@@ -295,8 +323,30 @@ export default function App() {
     window.history.pushState({}, "", url)
     setLocation({ experiment: experimentId, model, view })
   }
+  const modelTabs = group ? (
+    <div className="model-tabs" role="tablist" aria-label="Choose model">
+      {["gemini", "luna"]
+        .filter((key) => group.variants[key])
+        .map((key) => {
+          const batch = group.variants[key]
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={key === selectedModel}
+              className={key === selectedModel ? "active" : ""}
+              onClick={() => navigate(group.id, key)}
+            >
+              {modelName(batch.runs[0]?.model ?? key)}
+            </button>
+          )
+        })}
+    </div>
+  ) : null
   if (!location.experiment && location.view !== "experiments") {
-    const featured = groups.find((item) => item.id === "desk-lamp")?.variants.gemini
+    const featured = groups.find((item) => item.id === "desk-lamp")?.variants
+      .gemini
     return <LandingPage experiment={featured} onBrowse={() => navigate(null)} />
   }
   return (
@@ -315,66 +365,61 @@ export default function App() {
             <div className="title-row">
               <div className="experiment-title">
                 <button
-                    className="back-to-experiments"
-                    type="button"
-                    aria-label={group ? "Back to experiments" : "Back to home"}
-                    title={group ? "Back to experiments" : "Back to home"}
-                    onClick={() => navigate(null, selectedModel, group ? "experiments" : "home")}
-                  >
-                    <ArrowLeft size={20} aria-hidden="true" />
-                  </button>
-                <h1>{group?.name ?? "Experiments"}</h1>
-              </div>
-              {group && groups.length > 0 && (
-                <Select
-                  value={group.id}
-                  onValueChange={(value) =>
-                    value && navigate(value, selectedModel)
+                  className="back-to-experiments"
+                  type="button"
+                  aria-label={group ? "Back to experiments" : "Back to home"}
+                  title={group ? "Back to experiments" : "Back to home"}
+                  onClick={() =>
+                    navigate(
+                      null,
+                      selectedModel,
+                      group ? "experiments" : "home"
+                    )
                   }
-                  items={groups.map((item) => ({
-                    value: item.id,
-                    label: item.name,
-                  }))}
                 >
-                  <SelectTrigger
-                    aria-label="Choose experiment"
-                    className="experiment-select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start" className="min-w-52">
-                    {groups.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                  <ArrowLeft size={20} aria-hidden="true" />
+                </button>
+                <h1>
+                  {group ? (
+                    <Select
+                      value={group.id}
+                      onValueChange={(value) =>
+                        value && navigate(value, selectedModel)
+                      }
+                      items={groups.map((item) => ({
+                        value: item.id,
+                        label: item.name,
+                      }))}
+                    >
+                      <SelectTrigger
+                        aria-label="Choose experiment"
+                        className="experiment-title-select"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent
+                        alignItemWithTrigger={false}
+                        align="start"
+                        className="experiment-menu"
+                      >
+                        <SelectGroup>
+                          <SelectLabel>Choose experiment</SelectLabel>
+                          {groups.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    "Experiments"
+                  )}
+                </h1>
+              </div>
             </div>
           </div>
         </div>
-        {group && (
-          <div className="model-tabs" role="tablist" aria-label="Choose model">
-            {["gemini", "luna"]
-              .filter((key) => group.variants[key])
-              .map((key) => {
-                const batch = group.variants[key]
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={key === selectedModel}
-                    className={key === selectedModel ? "active" : ""}
-                    onClick={() => navigate(group.id, key)}
-                  >
-                    {modelName(batch.runs[0]?.model ?? key)}
-                  </button>
-                )
-              })}
-          </div>
-        )}
         {error ? (
           <Empty className="page-empty">
             <EmptyHeader>
@@ -408,7 +453,7 @@ export default function App() {
             ))}
           </div>
         ) : experiment ? (
-          <Comparison experiment={experiment} />
+          <Comparison experiment={experiment} modelTabs={modelTabs} />
         ) : groups.length > 0 ? (
           <div className="experiment-gallery" aria-label="Experiments">
             {groups.map((item) => (
