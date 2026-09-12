@@ -22,11 +22,15 @@ Open http://127.0.0.1:5173. For a production preview, run `npm run build` and `n
 
 Modal Volume → export function → selected JSON/images/GLBs → `public/data/` → Vite build.
 
-The bundle contains `results.json`, reference images, final agent renders, independent camera views, interactive GLBs. Full `.blend` files, checkpoints, credentials, and raw logs stay outside the website bundle. Export archives remain under `exports/` on the Modal results volume.
+The bundle contains `results.json`, reference images, final agent renders, independent camera views, interactive GLBs, and small evolution thumbnails. Full `.blend` files, original checkpoint archives, credentials, and raw logs stay outside the website bundle. Export archives remain under `exports/` on the Modal results volume.
+
+`scripts/render_evolution.py` selects up to six chronological render/preview checkpoints per run, validates that each image decodes, and exports 640px WebP thumbnails. Crops and named alternate/inspection views are excluded; the submitted render ends the sequence. This is filename-based selection, not a visual quality assessment. Timestamps are when the supervisor observed a saved file, not exact render completion times. The frontend loops checkpoints at equal intervals, holds the final frame longer, and provides one shared play/pause control. Reduced-motion users start paused.
 
 `scripts/frontend_data.py` reads the recorded outcomes and native usage counters. `scripts/export_results.py` selects batches, copies the display assets, and converts their references to relative static paths. The frontend fetches `data/results.json` once on page load.
 
 Missing values remain missing, and timed-out or failed runs retain their recorded status. Codex totals include cached input; other harnesses report cache separately. Claude Code uses per-model totals that include goal evaluation. Costs are not estimated.
+
+Tool-call totals come from `scripts/tool_accounting.py`: distinct Codex tool item IDs across start/completion events, Claude assistant `tool_use` IDs, and Kimi assistant `tool_calls` IDs. Repeated events are deduplicated; retries with new IDs count separately, and failed calls remain included. Counts describe harness-level invocations, not individual operations inside a shell command or Blender script. Missing logs produce an unreported value.
 
 ## Checks
 

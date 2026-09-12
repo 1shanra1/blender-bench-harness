@@ -5,6 +5,8 @@ import json
 import math
 from pathlib import Path
 
+from tool_accounting import reported_tool_calls
+
 ROOT = Path(__file__).resolve().parents[1]
 HARNESSES = ("codex", "cursor", "antigravity", "claude", "kimi")
 VIEWS = ("positive_x", "negative_x", "positive_y", "negative_y", "positive_z", "negative_z")
@@ -179,6 +181,7 @@ class LocalArchive:
                     "views": {view: asset(folder / "evaluation" / f"{view}.png", experiments_root) for view in VIEWS},
                     "evaluation_status": (result.get("evaluation") or {}).get("status", "unavailable"),
                     "usage": usage,
+                    "tool_calls": reported_tool_calls(folder / "capture" / f"{prefix}-events.jsonl", harness) if is_local_file(folder / "capture" / f"{prefix}-events.jsonl", experiments_root) else None,
                     "cost_usd": None,
                 })
             if not runs:

@@ -24,10 +24,12 @@ export type Run = {
   native_complete: boolean | null
   model_url: string | null
   render: string | null
+  evolution?: { src: string; elapsed_seconds: number | null; final: boolean }[]
   views: Record<Axis, string | null>
   evaluation_status: string
   elapsed_seconds: number | null
   limit_seconds: number | null
+  tool_calls?: number | null
   usage: Usage | null
   cost_usd: number | null
 }

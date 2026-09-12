@@ -20,6 +20,7 @@ import Captions from "yet-another-react-lightbox/plugins/captions"
 import Zoom from "yet-another-react-lightbox/plugins/zoom"
 import { LandingPage } from "@/components/landing-page"
 import { Metrics } from "@/components/metrics"
+import { Evolution } from "@/components/evolution"
 import { ModelInspectionModal } from "@/components/model-inspection-modal"
 import { Button } from "@/components/ui/button"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
@@ -171,6 +172,7 @@ function Comparison({
           ))}
         </div>
       </div>
+      <Evolution key={experiment.id} runs={experiment.runs} />
       <Metrics runs={experiment.runs} />
       <Lightbox
         open={lightbox >= 0}
@@ -225,6 +227,7 @@ export default function App() {
           item.reference = assetUrl(item.reference)
           for (const run of item.runs) {
             run.render = assetUrl(run.render)
+            run.evolution = run.evolution?.map((frame) => ({ ...frame, src: assetUrl(frame.src)! }))
             run.model_url = assetUrl(run.model_url)
             for (const [axis] of axes)
               run.views[axis] = assetUrl(run.views[axis])

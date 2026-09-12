@@ -8,6 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from frontend_data import LocalArchive, read_json
+from render_evolution import export_evolution
 
 
 def build_bundle(root, batches, destination, include_models=True):
@@ -47,6 +48,7 @@ def build_bundle(root, batches, destination, include_models=True):
         experiment["name"] = batches[experiment["id"]]
         experiment["reference"] = copy_asset(experiment["reference"])
         for run in experiment["runs"]:
+            run["evolution"] = export_evolution(experiments / experiment["id"] / run["id"], assets)
             run["render"] = copy_asset(run["render"])
             run["model_url"] = copy_asset(run["model_url"])
             run["views"] = {view: copy_asset(url) for view, url in run["views"].items()}
