@@ -8,7 +8,7 @@ from environment import BLENDER_VERSION, MCP_COMMIT, ROOT
 # Keep CPU capacity equal; memory can grow beyond its reservation if available.
 CPU = (4.0, 4.0)
 MEMORY_MIB = 8192
-EXPERIMENT_SECONDS = 75 * 60
+EXPERIMENT_SECONDS = 90 * 60
 REFERENCE = ROOT / "references/kettle/reference-01.png"
 PROMPT = ROOT / "prompts/reconstruction-draft.md"
 

@@ -67,7 +67,7 @@ print(f'Exported GLB with {len(selected)} objects to: {output_path}')
 """
 
 
-def export_run(run_dir: Path):
+def export_run(run_dir: Path, blender_path=BLENDER_PATH):
     blend_file = run_dir / "capture" / "artifacts" / "scene.blend"
     if not blend_file.is_file():
         blend_file = run_dir / "live-backup" / "scene.blend"
@@ -80,8 +80,10 @@ def export_run(run_dir: Path):
     out_glb = eval_dir / "scene.glb"
 
     cmd = [
-        BLENDER_PATH,
-        "-b",
+        blender_path,
+        "--background",
+        "--factory-startup",
+        "--disable-autoexec",
         str(blend_file),
         "--python-expr",
         BLENDER_EXPORT_SCRIPT,
@@ -90,7 +92,7 @@ def export_run(run_dir: Path):
     ]
 
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
         size_kb = out_glb.stat().st_size / 1024
         print(f"[+] Exported {run_dir.parent.name}/{run_dir.name}: {out_glb.name} ({size_kb:.1f} KB)")
         return True
@@ -108,7 +110,7 @@ def main():
         for batch in sorted(EXPERIMENTS_DIR.glob("*")):
             if not batch.is_dir():
                 continue
-            for harness in ("codex", "cursor", "antigravity"):
+            for harness in ("codex", "cursor", "antigravity", "claude"):
                 h_dir = batch / harness
                 if h_dir.is_dir():
                     target_dirs.append(h_dir)

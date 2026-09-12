@@ -39,20 +39,39 @@ export type Experiment = {
   runs: Run[]
 }
 
+export type ExperimentGroup = {
+  id: string
+  name: string
+  reference: string | null
+  variants: Record<string, Experiment>
+}
+
 export const pairColors: Record<string, string> = {
   codex: "#e0e1e5",
   cursor: "#a3abc2",
   antigravity: "#c6af87",
+  claude: "#d99a7e",
+  kimi: "#85b8a5",
 }
 export const pairLetters: Record<string, string> = {
   codex: "A",
   cursor: "B",
   antigravity: "C",
+  claude: "D",
+  kimi: "E",
 }
-export const modelName = (value: string) =>
+export const modelKey = (value: string) =>
   value.includes("gemini-3.8-flash")
-    ? "Gemini 3.8 Flash"
-    : value.replace(/^[^/]+\//, "")
+    ? "gemini"
+    : value.includes("gpt-5.6-luna")
+      ? "luna"
+      : value.replace(/^[^/]+\//, "")
+
+export const modelName = (value: string) => {
+  if (value.includes("gemini-3.8-flash")) return "Gemini 3.8 Flash High"
+  if (value.includes("gpt-5.6-luna")) return "GPT 5.6 Luna High"
+  return value.replace(/^[^/]+\//, "")
+}
 export function duration(seconds: number | null) {
   if (seconds === null) return "—"
   const rounded = Math.round(seconds)

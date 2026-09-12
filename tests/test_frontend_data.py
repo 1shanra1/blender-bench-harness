@@ -78,6 +78,13 @@ class ArchiveTests(unittest.TestCase):
         key = run["model_url"].split("/")[-1]
         self.assertEqual(self.archive.asset_path(key), glb)
 
+    def test_claude_code_is_included_in_results(self):
+        self.run_folder("claude")
+        run = self.archive.catalogue()["experiments"][0]["runs"][0]
+        self.assertEqual(run["id"], "claude")
+        self.assertEqual(run["name"], "Claude Code")
+        self.assertTrue(run["native_complete"])
+
     def test_symlinked_asset_and_parent_are_rejected(self):
         folder = self.run_folder()
         image = folder / "capture/artifacts/render.png"
@@ -133,6 +140,31 @@ class UsageTests(unittest.TestCase):
         result = self.parse("antigravity", [step, {"result": {"usage": {"total_tokens": 300, "cache_read_tokens": 2000}}}])
         self.assertEqual(result["tokens"], 300)
         self.assertEqual(result["cached_tokens"], 2000)
+
+    def test_claude_includes_goal_evaluator_without_double_counting_messages(self):
+        result = self.parse("claude", [
+            {"type": "assistant", "message": {"usage": {"input_tokens": 50, "output_tokens": 20}}},
+            {"type": "result",
+             "usage": {"input_tokens": 90, "output_tokens": 30},
+             "modelUsage": {"selected-model": {"inputTokens": 100, "outputTokens": 40, "cacheReadInputTokens": 1000, "cacheCreationInputTokens": 200}}},
+        ])
+        self.assertEqual(result["tokens"], 1340)
+        self.assertEqual(result["cached_tokens"], 1000)
+        self.assertIn("including goal evaluation", result["source"])
+
+    def test_kimi_sums_requests_but_ignores_step_end_copies(self):
+        usage = {"inputOther": 10, "output": 5, "inputCacheRead": 100, "inputCacheCreation": 20}
+        result = self.parse("kimi", [
+            {"type": "usage.record", "usage": usage},
+            {"type": "context.append_loop_event", "event": {"type": "step.end", "usage": usage}},
+            {"type": "usage.record", "usage": usage},
+        ])
+        self.assertEqual(result["tokens"], 270)
+        self.assertEqual(result["cached_tokens"], 200)
+
+    def test_claude_without_final_summary_stays_missing(self):
+        message = {"id": "same", "usage": {"input_tokens": 0, "output_tokens": 0}}
+        self.assertIsNone(self.parse("claude", [{"type": "assistant", "message": message}]))
 
     def test_invalid_numeric_counts_stay_missing(self):
         for bad in [-10, "100", True, float("inf")]:

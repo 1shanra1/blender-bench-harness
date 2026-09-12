@@ -19,6 +19,7 @@ __pycache__/
 .DS_Store
 node_modules/
 frontend/dist/
+frontend/public/data/
 *.tsbuildinfo
 
 # Private inputs and generated experiment artifacts

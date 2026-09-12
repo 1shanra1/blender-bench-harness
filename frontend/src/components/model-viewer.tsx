@@ -1,50 +1,33 @@
 import { useEffect, useRef, useState, useCallback } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js"
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { Box, Image as ImageIcon, RotateCcw } from "lucide-react"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Empty, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 
-type AxisKey = "positive_x" | "negative_x" | "positive_y" | "negative_y" | "positive_z" | "negative_z"
-
-const AXIS_DIRECTIONS: Record<AxisKey, [number, number, number]> = {
-  positive_x: [1, 0, 0],
-  negative_x: [-1, 0, 0],
-  positive_y: [0, 1, 0.0001],
-  negative_y: [0, -1, 0.0001],
-  positive_z: [0, 0, 1],
-  negative_z: [0, 0, -1],
-}
-
-const AXIS_LABELS: [AxisKey, string][] = [
-  ["positive_x", "+X"],
-  ["negative_x", "−X"],
-  ["positive_y", "+Y"],
-  ["negative_y", "−Y"],
-  ["positive_z", "+Z"],
-  ["negative_z", "−Z"],
-]
 
 export function ModelViewer({
   modelUrl,
   renderUrl,
   label,
   ratio = 1.33,
+  fillContainer = false,
   onOpenRender,
 }: {
   modelUrl: string | null
   renderUrl: string | null
   label: string
   ratio?: number
+  fillContainer?: boolean
   onOpenRender?: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const [showRender, setShowRender] = useState(false)
-  const [activeAxis, setActiveAxis] = useState<AxisKey | null>(null)
 
   const loading = Boolean(modelUrl && !showRender && loadedUrl !== modelUrl && failedUrl !== modelUrl)
   const error = Boolean(modelUrl && failedUrl === modelUrl)
@@ -100,25 +83,14 @@ export function ModelViewer({
     controls.enablePan = true
     controlsRef.current = controls
 
-    // Lighting (studio 3-point lighting setup)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2)
-    scene.add(ambientLight)
-
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2)
-    keyLight.position.set(3, 4, 3)
-    scene.add(keyLight)
-
-    const fillLight = new THREE.DirectionalLight(0xb5bccb, 1.1)
-    fillLight.position.set(-3, 1, 2)
-    scene.add(fillLight)
-
-    const rimLight = new THREE.DirectionalLight(0x9ca3af, 1.4)
-    rimLight.position.set(0, -3, -3)
-    scene.add(rimLight)
-
-    const topLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    topLight.position.set(0, 5, 0)
-    scene.add(topLight)
+    // Metals need a surrounding reflection environment, not just direct lights.
+    // Generate the same studio lighting locally for every model.
+    const room = new RoomEnvironment()
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    const environment = pmrem.fromScene(room)
+    scene.environment = environment.texture
+    room.dispose()
+    pmrem.dispose()
 
     // Load Model
     const loader = new GLTFLoader()
@@ -129,6 +101,21 @@ export function ModelViewer({
       (gltf) => {
         if (disposed) return
         const model = gltf.scene
+
+        // Some Blender exports retain anisotropy without tangents or UVs.
+        // Fall back to ordinary metal shading instead of an undefined direction.
+        model.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return
+          const geometry = object.geometry
+          if (geometry.hasAttribute("tangent") || geometry.hasAttribute("uv")) return
+          const materials = Array.isArray(object.material) ? object.material : [object.material]
+          for (const material of materials) {
+            if (material instanceof THREE.MeshPhysicalMaterial && material.anisotropy > 0) {
+              material.anisotropy = 0
+              material.needsUpdate = true
+            }
+          }
+        })
 
         // Calculate bounding box and center
         const box = new THREE.Box3().setFromObject(model)
@@ -199,6 +186,7 @@ export function ModelViewer({
       cancelAnimationFrame(requestRef.current)
       resizeObserver.disconnect()
       controls.dispose()
+      environment.dispose()
       renderer.dispose()
       scene.clear()
       if (container.contains(canvas)) {
@@ -207,40 +195,19 @@ export function ModelViewer({
     }
   }, [modelUrl, showRender])
 
-  // Snap to specific axis view
-  const snapToAxis = useCallback((axis: AxisKey) => {
-    const controls = controlsRef.current
-    const camera = cameraRef.current
-    if (!controls || !camera) return
-
-    setActiveAxis(axis)
-    const dir = AXIS_DIRECTIONS[axis]
-    const distance = initialCamPos.current.length()
-    const target = controls.target
-
-    camera.position.set(
-      target.x + dir[0] * distance,
-      target.y + dir[1] * distance,
-      target.z + dir[2] * distance
-    )
-    camera.lookAt(target)
-    controls.update()
-  }, [])
-
   // Reset to original isometric camera view
   const resetCamera = useCallback(() => {
     const controls = controlsRef.current
     const camera = cameraRef.current
     if (!controls || !camera) return
 
-    setActiveAxis(null)
     camera.position.copy(initialCamPos.current)
     controls.target.copy(initialTarget.current)
     controls.update()
   }, [])
 
-  return (
-    <AspectRatio ratio={ratio} className="image-frame relative group">
+  const content = (
+    <>
       {/* 3D Model Viewport */}
       {modelUrl && !error && !showRender ? (
         <div className="relative w-full h-full">
@@ -255,19 +222,7 @@ export function ModelViewer({
 
           {/* Floating Controls Overlay */}
           <div className="model-controls">
-            <div className="model-axis-bar" role="toolbar" aria-label="Camera snap views">
-              {AXIS_LABELS.map(([key, title]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`axis-chip ${activeAxis === key ? "active" : ""}`}
-                  onClick={() => snapToAxis(key)}
-                  aria-label={`View from ${title}`}
-                >
-                  {title}
-                </button>
-              ))}
-              <span className="axis-divider" />
+            <div className="model-axis-bar" role="toolbar" aria-label="Camera controls">
               <button
                 type="button"
                 className="axis-chip icon-chip"
@@ -283,7 +238,7 @@ export function ModelViewer({
                   className="axis-chip icon-chip"
                   onClick={() => setShowRender(true)}
                   aria-label="View 2D render"
-                  title="View Cycles render"
+                  title="View render"
                 >
                   <ImageIcon size={11} />
                 </button>
@@ -337,6 +292,16 @@ export function ModelViewer({
           </EmptyTitle>
         </Empty>
       )}
+    </>
+  )
+
+  if (fillContainer) {
+    return <div className="image-frame relative group w-full h-full">{content}</div>
+  }
+
+  return (
+    <AspectRatio ratio={ratio} className="image-frame relative group">
+      {content}
     </AspectRatio>
   )
 }

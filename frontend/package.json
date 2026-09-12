@@ -4,12 +4,12 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "python3 ../scripts/frontend_server.py --dev",
+    "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "preview": "python3 ../scripts/frontend_server.py"
+    "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

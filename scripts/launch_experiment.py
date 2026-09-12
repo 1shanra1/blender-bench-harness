@@ -3,6 +3,7 @@
 import argparse
 import json
 import uuid
+from pathlib import Path
 from datetime import datetime, timezone
 
 import modal
@@ -14,19 +15,23 @@ from verify_pairings import PAIRINGS
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", nargs="+", required=True, choices=PAIRINGS)
+    parser.add_argument("--model", help="Shared Vercel model ID for Codex, Claude Code, or Kimi Code")
+    parser.add_argument("--reference", type=Path, default=REFERENCE, help="Reference image for this batch")
     parser.add_argument("--skip-evaluation", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if len(set(args.harness)) != len(args.harness):
         parser.error("Specify each harness once")
+    if args.model and any(h not in {"codex", "claude", "kimi"} for h in args.harness):
+        parser.error("--model requires Vercel-backed harnesses")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     batch_id = timestamp + "-" + uuid.uuid4().hex[:8].upper()
     plan = {
         "batch_id": batch_id,
         "harnesses": args.harness,
-        "models": {h: PAIRINGS[h].model for h in args.harness},
+        "models": {h: args.model or PAIRINGS[h].model for h in args.harness},
         "seconds": EXPERIMENT_SECONDS,
-        "reference": str(REFERENCE),
+        "reference": str(args.reference),
         "prompt": str(PROMPT),
         "evaluation": not args.skip_evaluation,
         "volume": VOLUME_NAME,
@@ -37,9 +42,10 @@ def main():
         call = controller.spawn(
             batch_id,
             args.harness,
-            REFERENCE.read_bytes(),
+            args.reference.read_bytes(),
             PROMPT.read_bytes(),
             args.skip_evaluation,
+            model=args.model,
         )
         plan["call_id"] = call.object_id
     print(json.dumps(plan, indent=2))

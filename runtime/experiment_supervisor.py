@@ -111,8 +111,8 @@ def supervise(command, workspace, destination, seconds, env=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('harness', choices=['codex', 'cursor', 'antigravity'])
-    parser.add_argument('--seconds', type=int, default=75 * 60)
+    parser.add_argument('harness', choices=['codex', 'cursor', 'antigravity', 'claude', 'kimi'])
+    parser.add_argument('--seconds', type=int, default=90 * 60)
     args = parser.parse_args()
     env = dict(os.environ, BENCH_EXPERIMENT='1', BENCH_SECONDS=str(args.seconds),
         BENCH_OBJECTIVE=Path('/workspace/task.md').read_text())
@@ -141,9 +141,9 @@ def main():
             target = CAPTURE / 'scripts/files' / path.relative_to('/workspace/scripts')
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
-    prefix = {'codex': 'codex', 'cursor': 'cursor', 'antigravity': 'agy'}[args.harness]
+    prefix = 'agy' if args.harness == 'antigravity' else args.harness
     for name in [f'{prefix}-events.jsonl', f'{prefix}-events.timestamps.jsonl',
-                 f'{prefix}-stderr.log', 'codex-server.log', 'blender-mcp.log',
+                 f'{prefix}-stderr.log', f'{prefix}-transcript.jsonl', 'kimi-diagnostic.log', 'codex-server.log', 'blender-mcp.log',
                  'blender.log', 'bench-native-result.json']:
         path = Path('/tmp') / name
         if path.is_file() and not path.is_symlink():

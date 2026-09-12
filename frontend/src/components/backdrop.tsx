@@ -38,7 +38,7 @@ export default function Backdrop() {
         style={{
           width: "100%",
           height: "100%",
-          opacity: 0.65,
+          opacity: 0.38,
         }}
       />
     </div>

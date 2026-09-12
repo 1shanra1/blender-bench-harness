@@ -20,6 +20,11 @@ def main():
             "blender.log",
         )},
     }
+    if prefix == "kimi":
+        # Native reasoning and per-request usage live in the wire transcript.
+        transcripts = list(Path("/tmp/kimi-config").glob("sessions/*/*/agents/main/wire.jsonl"))
+        if len(transcripts) == 1:
+            logs["kimi-transcript.jsonl"] = transcripts[0]
     with tarfile.open("/tmp/bench-log-deltas.tar", "w") as archive:
         for name, path in logs.items():
             if not path.is_file() or path.is_symlink():

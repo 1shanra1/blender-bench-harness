@@ -11,6 +11,8 @@ from pathlib import Path
 import modal
 from antigravity_setup import AGY_VERSION
 from codex_setup import CODEX_VERSION
+from claude_setup import CLAUDE_VERSION
+from kimi_setup import KIMI_VERSION
 from cursor_setup import CURSOR_VERSION, CURSOR_TIMEOUT_PATCH
 from environment import ROOT, blender_image
 from live_collection import LiveCollector
@@ -28,6 +30,8 @@ VERSIONS = {
     "codex": CODEX_VERSION,
     "cursor": CURSOR_VERSION,
     "antigravity": AGY_VERSION,
+    "claude": CLAUDE_VERSION,
+    "kimi": KIMI_VERSION,
 }
 
 
@@ -103,17 +107,18 @@ def evaluate(folder, exclude_objects=()):
         sandbox.terminate()
 
 
-def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, commit=None):
+def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, commit=None, model=None):
     folder = batch / harness
     folder.mkdir()
     pairing = PAIRINGS[harness]
+    model = model or pairing.model
     sandbox = None
     collector = None
     stage = "setup"
     result = {}
     try:
         # Extra lifetime is for setup and collection; the supervisor caps the agent
-        # separately and kills its process group at 75 minutes.
+        # separately and kills its process group at 90 minutes.
         sandbox = create_sandbox(
             pairing.image, pairing.secret, pairing.domains, EXPERIMENT_SECONDS + 600
         )
@@ -121,14 +126,16 @@ def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, c
         manifest.update(
             harness=harness,
             harness_version=VERSIONS[harness],
-            model=pairing.model,
-            provider="vercel" if harness == "codex" else harness,
+            model=model,
+            provider="vercel" if harness in {"codex", "claude", "kimi"} else harness,
             sandbox_id=sandbox.object_id,
             reasoning_effort="high",
             started_at=datetime.now(timezone.utc).isoformat(),
         )
         if harness == "cursor":
             manifest["harness_patch"] = CURSOR_TIMEOUT_PATCH
+        if harness == "claude":
+            manifest["goal_evaluator_model"] = model
         (folder / "manifest.json").write_text(json.dumps(manifest, indent=2))
         (folder / "prompt.md").write_bytes(
             PROMPT.read_bytes() if prompt is None else prompt
@@ -148,7 +155,7 @@ def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, c
                 harness,
                 "--seconds",
                 str(EXPERIMENT_SECONDS),
-                env={"BENCH_MODEL": pairing.model},
+                env={"BENCH_MODEL": model},
                 timeout=EXPERIMENT_SECONDS + 300,
             )
             with (folder / "supervisor.log").open("w") as log:
@@ -202,11 +209,14 @@ def run(harness, batch, skip_evaluation=False, *, reference=None, prompt=None, c
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", nargs="+", required=True, choices=PAIRINGS)
+    parser.add_argument("--model", help="Shared Vercel model ID for Codex, Claude Code, or Kimi Code")
     parser.add_argument(
         "--dry-run", action="store_true", help="Print plan without Modal or model calls"
     )
     parser.add_argument("--skip-evaluation", action="store_true")
     args = parser.parse_args()
+    if args.model and any(h not in {"codex", "claude", "kimi"} for h in args.harness):
+        parser.error("--model requires Vercel-backed harnesses")
     if len(set(args.harness)) != len(args.harness):
         parser.error(
             "Specify each harness once; use another invocation for repetitions"
@@ -218,7 +228,7 @@ def main():
                     "harnesses": args.harness,
                     "seconds": EXPERIMENT_SECONDS,
                     "prompt": str(PROMPT),
-                    "models": {h: PAIRINGS[h].model for h in args.harness},
+                    "models": {h: args.model or PAIRINGS[h].model for h in args.harness},
                     "evaluation": not args.skip_evaluation,
                 },
                 indent=2,
@@ -238,7 +248,7 @@ def main():
     print("Results:", batch, flush=True)
     with ThreadPoolExecutor(max_workers=len(args.harness)) as pool:
         futures = [
-            pool.submit(run, h, batch, args.skip_evaluation) for h in args.harness
+            pool.submit(run, h, batch, args.skip_evaluation, model=args.model) for h in args.harness
         ]
         for future in as_completed(futures):
             harness, result = future.result()

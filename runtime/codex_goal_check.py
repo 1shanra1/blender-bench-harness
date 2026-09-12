@@ -13,7 +13,8 @@ OBJECTIVE = os.environ.get('BENCH_OBJECTIVE', OBJECTIVE)
 def main():
     home = Path('/root/.codex')
     home.mkdir(exist_ok=True)
-    gemini_provider = 'AI_GATEWAY_API_KEY' in os.environ or 'OPENROUTER_API_KEY' in os.environ
+    external_provider = 'AI_GATEWAY_API_KEY' in os.environ or 'OPENROUTER_API_KEY' in os.environ
+    model = os.environ.get('BENCH_MODEL', 'google/gemini-3.8-flash')
     if 'AI_GATEWAY_API_KEY' in os.environ:
         config = '/opt/bench/codex-vercel.toml'
     elif 'OPENROUTER_API_KEY' in os.environ:
@@ -26,7 +27,10 @@ def main():
     (home / 'config.toml').write_bytes(Path(config).read_bytes())
     Path('/workspace').mkdir(exist_ok=True)
     with open('/tmp/codex-server.log', 'w') as stderr, EventLog('/tmp/codex-events.jsonl') as events:
-        server = subprocess.Popen(['codex', 'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, text=True)
+        command = ['codex']
+        if external_provider:
+            command.extend(['-c', 'model=' + json.dumps(model)])
+        server = subprocess.Popen([*command, 'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, text=True)
         sequence = 0
         complete = False
         last_goal_status = None
@@ -79,11 +83,11 @@ def main():
             request('initialize', {'clientInfo': {'name': 'blender_bench_smoke', 'version': '0.1.0'}, 'capabilities': {'experimentalApi': True}})
             send('initialized', {})
             models = request('model/list', {})
-            print('Gemini catalog entries:', [m['model'] for m in models['data'] if 'gemini-3.8' in m['model']], flush=True)
+            print('Matching catalog entries:', [m['model'] for m in models['data'] if m['model'] == model], flush=True)
             thread = request('thread/start', {'cwd': '/workspace', 'approvalPolicy': 'never', 'sandbox': 'danger-full-access'})
             print('Selected model:', thread.get('model'), 'effort:', thread.get('reasoningEffort'), flush=True)
-            if gemini_provider and (thread.get('model') != 'google/gemini-3.8-flash' or thread.get('reasoningEffort') != 'high'):
-                raise RuntimeError('Requested Gemini model and High effort were not selected')
+            if external_provider and (thread.get('model') != model or thread.get('reasoningEffort') != 'high'):
+                raise RuntimeError('Requested model and High effort were not selected')
             request('thread/goal/set', {'threadId': thread['thread']['id'], 'objective': OBJECTIVE, 'status': 'active'})
             while True:
                 event = receive()

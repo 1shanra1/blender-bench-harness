@@ -1,4 +1,4 @@
-"""Read local reconstruction results for the frontend. Never contacts Modal."""
+"""Read reconstruction archives from disk for the website exporter."""
 
 import hashlib
 import json
@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-HARNESSES = ("codex", "cursor", "antigravity")
+HARNESSES = ("codex", "cursor", "antigravity", "claude", "kimi")
 VIEWS = ("positive_x", "negative_x", "positive_y", "negative_y", "positive_z", "negative_z")
 IMAGE_TYPES = {".png", ".jpg", ".jpeg", ".webp"}
 MODEL_TYPES = {".glb", ".gltf"}
@@ -40,15 +40,15 @@ def read_json(path, base):
 
 
 def reported_usage(path, harness):
-    """Read cumulative native summaries; do not sum repeated usage updates.
+    """Count input (including cache reads/writes) plus output for current harnesses.
 
-    Keep native token totals, which have different cache semantics across CLIs.
-    We expose cache counts separately and describe that difference in the UI.
-    No price estimate is inferred from tokens or the current model price.
+    Codex and Claude final summaries are cumulative; Kimi usage.record events
+    are per request. Never add the duplicated step.end copies of Kimi usage.
     """
     if not path.is_file():
         return None
     latest = None
+    kimi_records = []
     try:
         with path.open() as source:
             for line in source:
@@ -57,6 +57,8 @@ def reported_usage(path, harness):
                     if not isinstance(event, dict):
                         continue
                     candidate = None
+                    if harness == "kimi" and event.get("type") == "usage.record":
+                        kimi_records.append(event["usage"])
                     if harness == "codex" and event.get("method") == "thread/tokenUsage/updated":
                         usage = event["params"]["tokenUsage"]["total"]
                         candidate = {"tokens": number(usage.get("totalTokens")), "cached_tokens": number(usage.get("cachedInputTokens")), "basis": "Includes cached input", "source": "Codex cumulative token usage"}
@@ -67,22 +69,53 @@ def reported_usage(path, harness):
                     elif harness == "antigravity" and isinstance(event.get("result"), dict) and isinstance(event["result"].get("usage"), dict):
                         usage = event["result"]["usage"]
                         candidate = {"tokens": number(usage.get("total_tokens")), "cached_tokens": number(usage.get("cache_read_tokens")), "basis": "Cache reads reported separately", "source": "Antigravity final result"}
+                    elif harness == "claude" and event.get("type") == "result" and event.get("modelUsage"):
+                        # Top-level usage omits native /goal evaluation. The final
+                        # per-model counters include it; sum each model once.
+                        models = list(event["modelUsage"].values())
+                        counts = [number(model.get(key)) for model in models for key in ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")]
+                        cached = [number(model.get("cacheReadInputTokens")) for model in models]
+                        candidate = {
+                            "tokens": sum(counts) if all(value is not None for value in counts) else None,
+                            "cached_tokens": sum(cached) if all(value is not None for value in cached) else None,
+                            "basis": "Input including cache reads/writes + output",
+                            "source": "Claude Code per-model totals, including goal evaluation",
+                        }
                     if candidate is not None and candidate["tokens"] is not None:
                         latest = candidate
                 except (ValueError, TypeError, KeyError, AttributeError):
                     continue  # Partial JSON lines can occur during collection.
     except OSError:
         return None
+    if harness == "kimi":
+        return summed_usage(kimi_records,
+            ("inputOther", "output", "inputCacheRead", "inputCacheCreation"),
+            "inputCacheRead", "Kimi Code per-request usage records")
     return latest
 
 
+def summed_usage(records, keys, cache_key, source):
+    if not records:
+        return None
+    counts = [number(record.get(key)) for record in records for key in keys]
+    if any(value is None for value in counts):
+        return None
+    return {
+        "tokens": sum(counts),
+        "cached_tokens": sum(record[cache_key] for record in records),
+        "basis": "Input including cache reads/writes + output",
+        "source": source,
+    }
+
+
 class LocalArchive:
-    def __init__(self, root=ROOT):
+    def __init__(self, root=ROOT, experiments_root=None):
         self.root = root.resolve()
+        self.experiments_root = experiments_root or self.root / "outputs/experiments"
         self.assets = {}
 
-    def catalogue(self):
-        experiments_root = self.root / "outputs/experiments"
+    def catalogue(self, batch_ids=None):
+        experiments_root = self.experiments_root
         reference_root = self.root / "references"
         assets = {}
 
@@ -105,6 +138,8 @@ class LocalArchive:
         experiments = []
         batches = sorted(experiments_root.iterdir(), reverse=True) if experiments_root.is_dir() and not experiments_root.is_symlink() else []
         for batch in batches:
+            if batch_ids is not None and batch.name not in batch_ids:
+                continue
             if not batch.is_dir() or batch.is_symlink():
                 continue
             runs = []
@@ -122,14 +157,15 @@ class LocalArchive:
                 reference_hash = reference_hash if isinstance(reference_hash, str) and reference_hash else None
                 hashes.add(reference_hash)
                 reference = references.get(reference_hash) or reference
-                events = folder / "capture" / {"codex": "codex-events.jsonl", "cursor": "cursor-events.jsonl", "antigravity": "agy-events.jsonl"}[harness]
+                prefix = "agy" if harness == "antigravity" else harness
+                events = folder / "capture" / ("kimi-transcript.jsonl" if harness == "kimi" else f"{prefix}-events.jsonl")
                 usage = reported_usage(events, harness) if is_local_file(events, experiments_root) else None
                 glb_candidate = folder / "evaluation/scene.glb"
                 if not is_local_file(glb_candidate, experiments_root):
                     glb_candidate = folder / "capture/artifacts/scene.glb"
                 runs.append({
                     "id": harness,
-                    "name": {"codex": "Codex", "cursor": "Cursor", "antigravity": "Antigravity"}[harness],
+                    "name": {"codex": "Codex", "cursor": "Cursor", "antigravity": "Antigravity", "claude": "Claude Code", "kimi": "Kimi Code"}[harness],
                     "model": manifest.get("model", "Unknown model"),
                     "provider": manifest.get("provider"),
                     "effort": manifest.get("reasoning_effort"),
