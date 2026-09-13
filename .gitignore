@@ -20,6 +20,8 @@ __pycache__/
 node_modules/
 frontend/dist/
 frontend/public/data/
+frontend/public/social/
+docs/meshmatch-brand.md
 *.tsbuildinfo
 
 # Private inputs and generated experiment artifacts
