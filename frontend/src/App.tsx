@@ -21,24 +21,13 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom"
 import { LandingPage } from "@/components/landing-page"
 import { Metrics } from "@/components/metrics"
 import { Evolution } from "@/components/evolution"
-const ModelInspectionModal = lazy(() => import("@/components/model-inspection-modal").then((module) => ({ default: module.ModelInspectionModal })))
+const ModelInspectionModal = lazy(() =>
+  import("@/components/model-inspection-modal").then((module) => ({
+    default: module.ModelInspectionModal,
+  }))
+)
 import { Button } from "@/components/ui/button"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Empty,
@@ -61,7 +50,7 @@ function ImageFrame({
   src,
   label,
   onOpen,
-  ratio = 1,
+  ratio,
   className,
   emptyLabel = "No final render",
 }: {
@@ -73,9 +62,10 @@ function ImageFrame({
   emptyLabel?: string
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null)
-  const [loaded, setLoaded] = useState(false)
+  const [loaded, setLoaded] = useState(() => Boolean(ratio))
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null)
   return (
-    <AspectRatio ratio={ratio} className="image-frame">
+    <AspectRatio ratio={ratio ?? naturalRatio ?? 1} className="image-frame">
       {src && failedSource !== src ? (
         <button
           className="image-button"
@@ -87,7 +77,11 @@ function ImageFrame({
             src={src}
             alt={label}
             className={className}
-            onLoad={() => setLoaded(true)}
+            onLoad={(event) => {
+              const image = event.currentTarget
+              setNaturalRatio(image.naturalWidth / image.naturalHeight)
+              setLoaded(true)
+            }}
             onError={() => setFailedSource(src)}
           />
           <span className="enlarge-icon" aria-hidden="true">
@@ -111,16 +105,14 @@ function ImageFrame({
 function Comparison({
   experiment,
   modelTabs,
+  imageRatios,
 }: {
   experiment: Experiment
   modelTabs: ReactNode
+  imageRatios: ReadonlyMap<string, number>
 }) {
   const [lightbox, setLightbox] = useState(-1)
   const [inspectingRunId, setInspectingRunId] = useState<string | null>(null)
-  useEffect(() => {
-    setLightbox(-1)
-    setInspectingRunId(null)
-  }, [experiment.id])
   const firstModel = experiment.runs.find((run) => run.model_url)
   const images = [
     { src: experiment.reference, alt: `${experiment.name} — reference image` },
@@ -134,6 +126,8 @@ function Comparison({
   )
   const openImage = (src: string | null) =>
     setLightbox(slides.findIndex((item) => item.src === src))
+  const previewRatio = (src: string | null) =>
+    src ? imageRatios.get(src) : undefined
   return (
     <>
       <div className="comparison-toolbar">
@@ -157,6 +151,9 @@ function Comparison({
               </header>
               <ImageFrame
                 src={experiment.reference_preview ?? images[0].src}
+                ratio={previewRatio(
+                  experiment.reference_preview ?? images[0].src
+                )}
                 label={images[0].alt}
                 className="reference-img"
                 onOpen={() => openImage(images[0].src)}
@@ -172,6 +169,7 @@ function Comparison({
                 <ImageFrame
                   key={run.id}
                   src={run.render_preview ?? run.render}
+                  ratio={previewRatio(run.render_preview ?? run.render)}
                   emptyLabel={
                     run.status.endsWith("failed")
                       ? "Awaiting rerun"
@@ -185,7 +183,11 @@ function Comparison({
           ))}
         </div>
       </div>
-      <Evolution key={experiment.id} runs={experiment.runs} />
+      <Evolution
+        key={experiment.id}
+        runs={experiment.runs}
+        imageRatios={imageRatios}
+      />
       <Metrics runs={experiment.runs} />
       <Lightbox
         open={lightbox >= 0}
@@ -198,13 +200,15 @@ function Comparison({
         animation={{ fade: 150, swipe: 200 }}
       />
       {inspectingRunId && (
-        <Suspense fallback={null}><ModelInspectionModal
-          experiment={experiment}
-          activeRunId={inspectingRunId}
-          onClose={() => setInspectingRunId(null)}
-          onSelectRun={(id) => setInspectingRunId(id)}
-          onOpenRender={(src) => openImage(src)}
-        /></Suspense>
+        <Suspense fallback={null}>
+          <ModelInspectionModal
+            experiment={experiment}
+            activeRunId={inspectingRunId}
+            onClose={() => setInspectingRunId(null)}
+            onSelectRun={(id) => setInspectingRunId(id)}
+            onOpenRender={(src) => openImage(src)}
+          />
+        </Suspense>
       )}
     </>
   )
@@ -213,11 +217,13 @@ function Comparison({
 export default function App() {
   const [experiments, setExperiments] = useState<Experiment[] | null>(null)
   const [location, setLocation] = useState(() => ({
-    view: new URLSearchParams(window.location.search).get("view"),
     experiment: new URLSearchParams(window.location.search).get("experiment"),
     model: new URLSearchParams(window.location.search).get("model") ?? "gemini",
   }))
   const navigationRequest = useRef(0)
+  const [imageRatios, setImageRatios] = useState(
+    () => new Map<string, number>()
+  )
   const [error, setError] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
@@ -250,7 +256,7 @@ export default function App() {
             for (const [axis] of axes)
               run.views[axis] = assetUrl(run.views[axis])
           }
-          const harnessOrder = ["codex", "kimi", "claude"]
+          const harnessOrder = ["codex", "claude", "kimi"]
           const harnessRank = (id: string) => {
             const rank = harnessOrder.indexOf(id)
             return rank < 0 ? harnessOrder.length : rank
@@ -270,7 +276,6 @@ export default function App() {
       navigationRequest.current += 1
       const params = new URLSearchParams(window.location.search)
       setLocation({
-        view: params.get("view"),
         experiment: params.get("experiment"),
         model: params.get("model") ?? "gemini",
       })
@@ -313,25 +318,39 @@ export default function App() {
 
   const navigate = async (
     experimentId: string | null,
-    model = selectedModel,
-    view = "experiments"
+    model = selectedModel
   ) => {
     const request = ++navigationRequest.current
     const target = groups.find((item) => item.id === experimentId)
     const batch =
       target?.variants[model] ?? Object.values(target?.variants ?? {})[0]
+    const decodedRatios = new Map<string, number>()
     if (batch) {
       // Keep the current comparison visible until the next images are decoded.
-      const sources = [batch.reference_preview ?? batch.reference, ...batch.runs.map((run) => run.render_preview ?? run.render)]
+      const sources = [
+        batch.reference_preview ?? batch.reference,
+        ...batch.runs.map((run) => run.render_preview ?? run.render),
+        ...batch.runs.map((run) => run.evolution?.[0]?.src ?? null),
+      ]
       await Promise.all(
         sources.filter(Boolean).map(async (src) => {
           const image = new Image()
           image.src = src!
           await image.decode().catch(() => undefined)
+          if (image.naturalWidth && image.naturalHeight) {
+            decodedRatios.set(src!, image.naturalWidth / image.naturalHeight)
+          }
         })
       )
     }
     if (request !== navigationRequest.current) return
+    if (decodedRatios.size) {
+      setImageRatios((current) => {
+        const next = new Map(current)
+        decodedRatios.forEach((ratio, src) => next.set(src, ratio))
+        return next
+      })
+    }
 
     const url = new URL(window.location.href)
     url.searchParams.delete("view")
@@ -341,10 +360,10 @@ export default function App() {
     } else {
       url.searchParams.delete("experiment")
       url.searchParams.delete("model")
-      if (view === "experiments") url.searchParams.set("view", "experiments")
     }
     window.history.pushState({}, "", url)
-    setLocation({ experiment: experimentId, model, view })
+    setLocation({ experiment: experimentId, model })
+    window.scrollTo(0, 0)
   }
   const modelTabs = group ? (
     <div className="model-tabs" role="tablist" aria-label="Choose model">
@@ -367,10 +386,50 @@ export default function App() {
         })}
     </div>
   ) : null
-  if (!location.experiment && location.view !== "experiments") {
+  const objectTabs = group ? (
+    <nav className="experiment-tabs" aria-label="Choose object">
+      <div className="experiment-tabs-list" role="tablist">
+        {groups.map((item) => {
+          const isSelected = item.id === group.id
+          const nextModel = item.variants[selectedModel]
+            ? selectedModel
+            : item.variants.gemini
+              ? "gemini"
+              : Object.keys(item.variants)[0]
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              className={isSelected ? "active" : ""}
+              onClick={() => navigate(item.id, nextModel)}
+            >
+              {item.name}
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  ) : null
+  if (!location.experiment) {
     const featured = groups.find((item) => item.id === "desk-lamp")?.variants
       .gemini
-    return <LandingPage experiment={featured} onBrowse={() => navigate(null)} />
+    const firstExperiment =
+      groups.find((item) => item.id === "sunglasses") ?? groups[0]
+    const firstModel = firstExperiment?.variants.gemini
+      ? "gemini"
+      : Object.keys(firstExperiment?.variants ?? {})[0]
+    return (
+      <LandingPage
+        experiment={featured}
+        onBrowse={() => {
+          if (firstExperiment && firstModel) {
+            navigate(firstExperiment.id, firstModel)
+          }
+        }}
+      />
+    )
   }
   return (
     <div className="app-shell">
@@ -378,9 +437,7 @@ export default function App() {
         Skip to results
       </a>
       <main id="main" className="workspace">
-        <div
-          className={`page-heading ${group ? "detail-heading" : "gallery-heading"}`}
-        >
+        <div className="page-heading detail-heading">
           <Suspense fallback={null}>
             <Backdrop />
           </Suspense>
@@ -390,59 +447,18 @@ export default function App() {
                 <button
                   className="back-to-experiments"
                   type="button"
-                  aria-label={group ? "Back to experiments" : "Back to home"}
-                  title={group ? "Back to experiments" : "Back to home"}
-                  onClick={() =>
-                    navigate(
-                      null,
-                      selectedModel,
-                      group ? "experiments" : "home"
-                    )
-                  }
+                  aria-label="Back to home"
+                  title="Back to home"
+                  onClick={() => navigate(null, selectedModel)}
                 >
                   <ArrowLeft size={20} aria-hidden="true" />
                 </button>
-                <h1>
-                  {group ? (
-                    <Select
-                      value={group.id}
-                      onValueChange={(value) =>
-                        value && navigate(value, selectedModel)
-                      }
-                      items={groups.map((item) => ({
-                        value: item.id,
-                        label: item.name,
-                      }))}
-                    >
-                      <SelectTrigger
-                        aria-label="Choose experiment"
-                        className="experiment-title-select"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent
-                        alignItemWithTrigger={false}
-                        align="start"
-                        className="experiment-menu"
-                      >
-                        <SelectGroup>
-                          <SelectLabel>Choose experiment</SelectLabel>
-                          {groups.map((item) => (
-                            <SelectItem key={item.id} value={item.id}>
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    "Experiments"
-                  )}
-                </h1>
+                <h1>{group?.name ?? "Experiment"}</h1>
               </div>
             </div>
           </div>
         </div>
+        {objectTabs}
         {error ? (
           <Empty className="page-empty">
             <EmptyHeader>
@@ -476,47 +492,12 @@ export default function App() {
             ))}
           </div>
         ) : experiment ? (
-          <Comparison experiment={experiment} modelTabs={modelTabs} />
-        ) : groups.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border border-border bg-card/40">
-            <Table aria-label="Experiments">
-              <TableBody>
-                {groups.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer focus-within:bg-muted/50"
-                    onClick={() => navigate(item.id, location.model)}
-                  >
-                    <TableCell className="px-5 py-4">
-                      <button
-                        type="button"
-                        className="flex items-center gap-4 rounded-sm text-left outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
-                      >
-                        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white">
-                          {item.reference ? (
-                            <img
-                              src={item.reference_preview ?? item.reference}
-                              alt=""
-                              className="size-full object-contain"
-                            />
-                          ) : (
-                            <ImageOff
-                              size={20}
-                              className="text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </span>
-                        <span className="font-medium whitespace-normal">
-                          {item.name}
-                        </span>
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <Comparison
+            key={experiment.id}
+            experiment={experiment}
+            modelTabs={modelTabs}
+            imageRatios={imageRatios}
+          />
         ) : (
           <Empty className="page-empty">
             <EmptyHeader>

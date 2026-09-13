@@ -8,7 +8,13 @@ type Sequence = {
   frames: NonNullable<Run["evolution"]>
 }
 
-export function Evolution({ runs }: { runs: Run[] }) {
+export function Evolution({
+  runs,
+  imageRatios,
+}: {
+  runs: Run[]
+  imageRatios: ReadonlyMap<string, number>
+}) {
   const section = useRef<HTMLElement>(null)
   const [sequences, setSequences] = useState<Sequence[] | null>(null)
   const [playing, setPlaying] = useState(
@@ -108,10 +114,19 @@ export function Evolution({ runs }: { runs: Run[] }) {
             sequence.frames.length - 1
           )
           const frame = sequence.frames[index]
+          const initialFrame = runs
+            .find((run) => run.id === sequence.id)
+            ?.evolution?.[0]
+          const initialRatio = initialFrame
+            ? imageRatios.get(initialFrame.src)
+            : undefined
           return (
             <article className="evolution-card" key={sequence.id}>
               <h3>{sequence.name}</h3>
-              <div className="evolution-image">
+              <div
+                className={`evolution-image${frame ? "" : " is-empty"}`}
+                style={frame ? undefined : { aspectRatio: initialRatio }}
+              >
                 {frame ? (
                   <>
                     <img
