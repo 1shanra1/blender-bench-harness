@@ -21,7 +21,7 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom"
 import { LandingPage } from "@/components/landing-page"
 import { Metrics } from "@/components/metrics"
 import { Evolution } from "@/components/evolution"
-import { ModelInspectionModal } from "@/components/model-inspection-modal"
+const ModelInspectionModal = lazy(() => import("@/components/model-inspection-modal").then((module) => ({ default: module.ModelInspectionModal })))
 import { Button } from "@/components/ui/button"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import {
@@ -33,6 +33,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Empty,
@@ -57,12 +63,14 @@ function ImageFrame({
   onOpen,
   ratio = 1,
   className,
+  emptyLabel = "No final render",
 }: {
   src: string | null
   label: string
   onOpen: () => void
   ratio?: number
   className?: string
+  emptyLabel?: string
 }) {
   const [failedSource, setFailedSource] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -92,7 +100,7 @@ function ImageFrame({
             <ImageOff size={24} strokeWidth={1.3} />
           </EmptyMedia>
           <EmptyTitle className="font-normal text-muted-foreground">
-            {src ? "Image unavailable" : "No final render"}
+            {src ? "Image unavailable" : emptyLabel}
           </EmptyTitle>
         </Empty>
       )}
@@ -148,7 +156,7 @@ function Comparison({
                 <h2>Reference</h2>
               </header>
               <ImageFrame
-                src={images[0].src}
+                src={experiment.reference_preview ?? images[0].src}
                 label={images[0].alt}
                 className="reference-img"
                 onOpen={() => openImage(images[0].src)}
@@ -163,7 +171,12 @@ function Comparison({
                 </header>
                 <ImageFrame
                   key={run.id}
-                  src={run.render}
+                  src={run.render_preview ?? run.render}
+                  emptyLabel={
+                    run.status.endsWith("failed")
+                      ? "Awaiting rerun"
+                      : "No final render"
+                  }
                   label={`${modelName(run.model)} · ${run.name}`}
                   onOpen={() => openImage(run.render)}
                 />
@@ -185,13 +198,13 @@ function Comparison({
         animation={{ fade: 150, swipe: 200 }}
       />
       {inspectingRunId && (
-        <ModelInspectionModal
+        <Suspense fallback={null}><ModelInspectionModal
           experiment={experiment}
           activeRunId={inspectingRunId}
           onClose={() => setInspectingRunId(null)}
           onSelectRun={(id) => setInspectingRunId(id)}
           onOpenRender={(src) => openImage(src)}
-        />
+        /></Suspense>
       )}
     </>
   )
@@ -225,9 +238,14 @@ export default function App() {
           path ? new URL(path, dataUrl).href : null
         for (const item of data.experiments as Experiment[]) {
           item.reference = assetUrl(item.reference)
+          item.reference_preview = assetUrl(item.reference_preview ?? null)
           for (const run of item.runs) {
             run.render = assetUrl(run.render)
-            run.evolution = run.evolution?.map((frame) => ({ ...frame, src: assetUrl(frame.src)! }))
+            run.render_preview = assetUrl(run.render_preview ?? null)
+            run.evolution = run.evolution?.map((frame) => ({
+              ...frame,
+              src: assetUrl(frame.src)!,
+            }))
             run.model_url = assetUrl(run.model_url)
             for (const [axis] of axes)
               run.views[axis] = assetUrl(run.views[axis])
@@ -274,10 +292,12 @@ export default function App() {
         id,
         name: batch.name,
         reference: batch.reference,
+        reference_preview: batch.reference_preview,
         variants: {},
       }
       const key = modelKey(batch.runs[0]?.model ?? batch.id)
       current.reference ??= batch.reference
+      current.reference_preview ??= batch.reference_preview
       current.variants[key] = batch
       grouped.set(id, current)
     }
@@ -302,7 +322,7 @@ export default function App() {
       target?.variants[model] ?? Object.values(target?.variants ?? {})[0]
     if (batch) {
       // Keep the current comparison visible until the next images are decoded.
-      const sources = [batch.reference, ...batch.runs.map((run) => run.render)]
+      const sources = [batch.reference_preview ?? batch.reference, ...batch.runs.map((run) => run.render_preview ?? run.render)]
       await Promise.all(
         sources.filter(Boolean).map(async (src) => {
           const image = new Image()
@@ -328,7 +348,7 @@ export default function App() {
   }
   const modelTabs = group ? (
     <div className="model-tabs" role="tablist" aria-label="Choose model">
-      {["gemini", "luna"]
+      {["gemini", "luna", "terra"]
         .filter((key) => group.variants[key])
         .map((key) => {
           const batch = group.variants[key]
@@ -458,24 +478,44 @@ export default function App() {
         ) : experiment ? (
           <Comparison experiment={experiment} modelTabs={modelTabs} />
         ) : groups.length > 0 ? (
-          <div className="experiment-gallery" aria-label="Experiments">
-            {groups.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="experiment-card"
-                onClick={() => navigate(item.id, location.model)}
-              >
-                <div className="experiment-card-image">
-                  {item.reference ? (
-                    <img src={item.reference} alt={`${item.name} reference`} />
-                  ) : (
-                    <ImageOff size={28} />
-                  )}
-                </div>
-                <h2>{item.name}</h2>
-              </button>
-            ))}
+          <div className="overflow-hidden rounded-lg border border-border bg-card/40">
+            <Table aria-label="Experiments">
+              <TableBody>
+                {groups.map((item) => (
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer focus-within:bg-muted/50"
+                    onClick={() => navigate(item.id, location.model)}
+                  >
+                    <TableCell className="px-5 py-4">
+                      <button
+                        type="button"
+                        className="flex items-center gap-4 rounded-sm text-left outline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white">
+                          {item.reference ? (
+                            <img
+                              src={item.reference_preview ?? item.reference}
+                              alt=""
+                              className="size-full object-contain"
+                            />
+                          ) : (
+                            <ImageOff
+                              size={20}
+                              className="text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </span>
+                        <span className="font-medium whitespace-normal">
+                          {item.name}
+                        </span>
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <Empty className="page-empty">

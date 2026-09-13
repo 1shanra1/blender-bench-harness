@@ -40,8 +40,8 @@ export function Metrics({ runs }: { runs: Run[] }) {
                     <TooltipContent className="leading-relaxed">
                       Total input tokens, including cache reads and writes, plus
                       output tokens across requests. Cached input is counted
-                      once per request. Missing final usage summaries are left
-                      unreported.
+                      once per request. ≥ marks recovered usage for recorded
+                      requests; the full run may have used more.
                     </TooltipContent>
                   </Tooltip>
                 </span>
@@ -69,6 +69,7 @@ export function Metrics({ runs }: { runs: Run[] }) {
           <tbody>
             {ordered.map((run) => {
               const tokens = run.usage?.tokens
+              const partial = run.usage?.coverage === "recorded_requests"
               return (
                 <tr key={run.id}>
                   <th scope="row">{run.name}</th>
@@ -100,13 +101,15 @@ export function Metrics({ runs }: { runs: Run[] }) {
                       <Tooltip>
                         <TooltipTrigger
                           className="token-value-trigger"
-                          aria-label={`${run.name}: ${exact.format(tokens)} tokens.`}
+                          aria-label={`${run.name}: ${partial ? "at least " : ""}${exact.format(tokens)} tokens.`}
                         >
+                          {partial ? "≥ " : ""}
                           {count.format(tokens)}
                         </TooltipTrigger>
                         <TooltipContent className="flex-col items-start leading-relaxed">
-                          <strong>{exact.format(tokens)} tokens</strong>
+                          <strong>{partial ? "At least " : ""}{exact.format(tokens)} tokens</strong>
                           <span>{run.usage?.source}</span>
+                          {partial && <span>{run.usage?.request_count} recorded requests</span>}
                           {run.usage?.cached_tokens != null && (
                             <span>
                               {exact.format(run.usage.cached_tokens)} cached

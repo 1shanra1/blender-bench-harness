@@ -1,4 +1,4 @@
-# Results website
+# Meshmatch results website
 
 A static React/Vite gallery of published experiment results. The website needs no Python server, database, or connection to Modal.
 
@@ -34,8 +34,19 @@ Tool-call totals come from `scripts/tool_accounting.py`: distinct Codex tool ite
 
 ## Checks
 
+`npm run build` prepares 960px card previews and bounds evolution frames to 640px using Sharp. Original renders and references remain available for enlargement; usage and timing fields are unchanged. Run `npm run prepare:images` after replacing local exports during development. Evolution images load when the section enters the viewport, and the 3D viewer code loads only when opened.
+
 ```sh
 uv run python -m unittest discover -s tests
 cd frontend
 npm run build
+node --test scripts/prepare-previews.test.mjs
 ```
+
+## Cloudflare Pages
+
+The site uses Direct Upload so the exported results are included even though they are not stored in Git. From `frontend/`, run `npx wrangler login` once, then `npm run deploy`. The Pages project is named `meshmatch`; `main` is the production deployment branch. Always keep the current `public/data/` export present before building.
+
+Add `meshmatch.net` and `www.meshmatch.net` under the Pages project's Custom domains settings after the first deployment. Associate each domain with Pages before creating its DNS record. The results catalogue uses `Cache-Control: no-cache` so returning visitors can receive updated experiment data.
+
+Cloudflare Pages permits individual assets up to 25 MiB. The current largest GLB is about 20 MiB; check this limit when adding new results. Deploy only `dist/`, which contains public site assets rather than raw logs, Blender source files, or credentials.

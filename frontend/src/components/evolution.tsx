@@ -15,30 +15,31 @@ export function Evolution({ runs }: { runs: Run[] }) {
     () => !window.matchMedia("(prefers-reduced-motion: reduce)").matches
   )
   const [visible, setVisible] = useState(false)
+  const [requested, setRequested] = useState(false)
   const [step, setStep] = useState(0)
   const available = runs.some((run) => (run.evolution?.length ?? 0) > 1)
 
   useEffect(() => {
-    if (!available) return
+    if (!available || !requested) return
     let cancelled = false
     Promise.all(
       runs.map(async (run) => {
-        const frames = await Promise.all(
-          (run.evolution ?? []).map(async (frame) => {
-            const image = new Image()
-            image.src = frame.src
-            try {
-              await image.decode()
-              return frame
-            } catch {
-              return null
-            }
-          })
-        )
+        const frames: Sequence["frames"] = []
+        for (const frame of run.evolution ?? []) {
+          if (cancelled) break
+          const image = new Image()
+          image.src = frame.src
+          try {
+            await image.decode()
+            frames.push(frame)
+          } catch {
+            // Skip incomplete checkpoints, retaining the usable sequence.
+          }
+        }
         return {
           id: run.id,
           name: run.name,
-          frames: frames.filter((frame) => frame !== null),
+          frames,
         }
       })
     ).then((loaded) => {
@@ -47,13 +48,14 @@ export function Evolution({ runs }: { runs: Run[] }) {
     return () => {
       cancelled = true
     }
-  }, [runs, available])
+  }, [runs, available, requested])
 
   useEffect(() => {
     if (!section.current) return
-    const observer = new IntersectionObserver(([entry]) =>
+    const observer = new IntersectionObserver(([entry]) => {
       setVisible(entry.isIntersecting)
-    )
+      if (entry.isIntersecting) setRequested(true)
+    })
     observer.observe(section.current)
     return () => observer.disconnect()
   }, [available])

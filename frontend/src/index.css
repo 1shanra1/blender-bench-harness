@@ -203,55 +203,8 @@ h1 {
   border-color: #42444b;
   background: #28292e;
 }
-.experiment-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 260px));
-  gap: 20px;
-}
-.experiment-card {
-  overflow: hidden;
-  padding: 0;
-  text-align: left;
-  color: inherit;
-  border: 1px solid #28292d;
-  border-radius: 10px;
-  background: #111214;
-  transition:
-    border-color 0.15s,
-    transform 0.15s;
-}
-.experiment-card:hover {
-  border-color: #383a40;
-  transform: translateY(-1px);
-}
-.experiment-card-image {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 1;
-  overflow: hidden;
-  color: #696b72;
-  background: #0d0e10;
-}
-.experiment-card-image img {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  object-fit: contain;
-}
-.experiment-card h2 {
-  margin: 0;
-  padding: 14px 16px;
-  font-size: 14px;
-  font-weight: 550;
-}
 .comparison {
   gap: 18px;
-}
-.comparison-toolbar {
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 .comparison-toolbar [data-slot="tabs-list"] {
   border: 1px solid #222328;
@@ -521,9 +474,6 @@ h1 {
     align-items: stretch;
     flex-direction: column;
     margin-top: 0;
-  }
-  .experiment-gallery {
-    grid-template-columns: minmax(0, 260px);
   }
   .experiment-select {
     width: 100%;
@@ -855,6 +805,9 @@ h1 {
   max-width: 800px;
 }
 .landing-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 0 0 28px;
   color: #a1a3ab;
   font-size: 14px;
@@ -1004,6 +957,8 @@ h1 {
 }
 .comparison-toolbar {
   display: flex;
+  min-height: 34px;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -1013,8 +968,16 @@ h1 {
 .inspect-models { flex-shrink: 0; }
 .comparison .render-header { height: 60px; padding-block: 16px; }
 @media (max-width: 560px) {
-  .comparison-toolbar { flex-wrap: wrap; }
+  .comparison-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
   .comparison-toolbar .model-tabs { flex-direction: row; flex-wrap: wrap; }
+  .comparison-toolbar .inspect-models {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 
 .evolution { margin-top: 36px; }

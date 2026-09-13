@@ -9,6 +9,8 @@ export const axes = [
 
 export type Axis = (typeof axes)[number][0]
 export type Usage = {
+  coverage?: "recorded_requests"
+  request_count?: number
   tokens: number | null
   cached_tokens: number | null
   basis: string
@@ -23,6 +25,7 @@ export type Run = {
   status: string
   native_complete: boolean | null
   model_url: string | null
+  render_preview?: string | null
   render: string | null
   evolution?: { src: string; elapsed_seconds: number | null; final: boolean }[]
   views: Record<Axis, string | null>
@@ -36,6 +39,7 @@ export type Run = {
 export type Experiment = {
   id: string
   name: string
+  reference_preview?: string | null
   reference: string | null
   started_at: string | null
   runs: Run[]
@@ -44,6 +48,7 @@ export type Experiment = {
 export type ExperimentGroup = {
   id: string
   name: string
+  reference_preview?: string | null
   reference: string | null
   variants: Record<string, Experiment>
 }
@@ -67,11 +72,14 @@ export const modelKey = (value: string) =>
     ? "gemini"
     : value.includes("gpt-5.6-luna")
       ? "luna"
+      : value.includes("gpt-5.6-terra")
+        ? "terra"
       : value.replace(/^[^/]+\//, "")
 
 export const modelName = (value: string) => {
   if (value.includes("gemini-3.8-flash")) return "Gemini 3.8 Flash High"
   if (value.includes("gpt-5.6-luna")) return "GPT 5.6 Luna High"
+  if (value.includes("gpt-5.6-terra")) return "GPT 5.6 Terra High"
   return value.replace(/^[^/]+\//, "")
 }
 export function duration(seconds: number | null) {

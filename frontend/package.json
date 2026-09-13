@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
+    "build": "npm run prepare:images && tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name meshmatch --branch main",
+    "prepare:images": "node scripts/prepare-previews.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -42,8 +44,10 @@
     "globals": "^17",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
+    "sharp": "^0.35.4",
     "typescript": "~6",
     "typescript-eslint": "^8",
-    "vite": "^8"
+    "vite": "^8",
+    "wrangler": "4.131.1"
   }
 }

@@ -1,4 +1,4 @@
-# Blender Bench Harness
+# Meshmatch
 
 Compare how vision models reconstruct editable 3D objects from reference images using coding agents and the [official Blender MCP server](https://www.blender.org/lab/mcp-server/).
 
