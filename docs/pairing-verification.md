@@ -1,6 +1,8 @@
-# Gemini 3.8 Flash High setup verification
+# Model–harness pairing verification
 
-Verified September 8, 2026. No reconstruction experiments have been run.
+These notes record compatibility checks beginning September 8, 2026, with later checks below. Reconstruction experiments have since been published at [meshmatch.net](https://meshmatch.net); see the [current experiment matrix](../README.md#the-published-experiments). A passing compatibility check establishes basic image/tool transport and goal behavior, not reconstruction quality.
+
+## Initial Gemini 3.8 Flash High checks
 
 | Harness | Requested model | Result |
 | --- | --- | --- |

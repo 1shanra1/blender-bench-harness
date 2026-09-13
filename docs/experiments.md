@@ -1,11 +1,15 @@
 # Reconstruction runs
 
-Each selected harness gets a new Modal sandbox, its required credential Secret, the same reference image and approved prompt, and the shared Blender environment. No histories, output directories, or volumes are shared between agents. Codex and Claude Code use Gemini 3.8 Flash through Vercel; Cursor and Antigravity select their native Gemini 3.8 Flash High entries.
+Each selected harness gets a new Modal sandbox, its required credential Secret, the same reference image and approved prompt, and the shared Blender environment. No histories, output directories, or volumes are shared between agents. Codex, Claude Code, and Kimi Code use Vercel AI Gateway and accept a shared `--model` override. Cursor and Antigravity select their native Gemini 3.8 Flash High entries. The [README](../README.md#the-published-experiments) lists the models and harnesses in the published comparison.
 
 Preview without creating sandboxes or calling models:
 
 ```sh
-uv run python scripts/launch_experiment.py --harness codex cursor claude --dry-run
+uv run python scripts/launch_experiment.py \
+  --harness codex claude kimi \
+  --model google/gemini-3.8-flash \
+  --reference /path/to/reference.png \
+  --dry-run
 ```
 
 Deploy the controller once, and redeploy after changing its code or bundled runtime:
