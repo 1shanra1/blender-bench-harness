@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 
 from tool_accounting import reported_tool_calls
+from gateway_accounting import generation_ids, recovered_usage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESSES = ("codex", "cursor", "antigravity", "claude", "kimi")
@@ -96,6 +97,66 @@ def reported_usage(path, harness):
     return latest
 
 
+def gateway_usage_fallback(folder, events):
+    """Verify recovery evidence against the captured stream before publishing it."""
+    report = read_json(folder / "gateway-usage-recovery.json", folder)
+    if report.get("schema_version") != 1 or not is_local_file(events, folder):
+        return None
+    try:
+        raw = events.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != report.get("events_sha256"):
+            return None
+        parsed = []
+        for line in raw.splitlines():
+            try:
+                parsed.append(json.loads(line))
+            except ValueError:
+                continue
+        ids = generation_ids(parsed)
+        records = report["records"]
+        if not ids or sorted(r["id"] for r in records) != ids:
+            return None
+        return recovered_usage(records)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def presentation_asset(folder, kind):
+    """Prefer captured deliverables; allow explicitly recorded recovery rebuilds."""
+    original = folder / "capture/artifacts" / kind
+    if is_local_file(original, folder):
+        return original
+    recovery = folder / "recovery-rebuild"
+    if read_json(recovery / "recovery.json", folder).get("kind") == "post-run script rebuild":
+        candidate = recovery / {"scene.blend": "rebuilt-scene.blend", "render.png": "rebuilt-render.png"}[kind]
+        if is_local_file(candidate, folder):
+            return candidate
+    return original
+
+
+def presentation_result(folder, result):
+    """Use the supervisor's recorded verdict after verified artifact recovery.
+
+    Collection errors remain in result.json; never infer agent completion from
+    an image or a post-run rebuild.
+    """
+    recovery = read_json(folder / "recovery.json", folder)
+    log = folder / "supervisor.log"
+    if not recovery.get("blend_validation") or not is_local_file(log, folder):
+        return result
+    for line in reversed(log.read_text().splitlines()):
+        try:
+            saved = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(saved, dict) and saved.get("limit_seconds")
+                and saved.get("status") == "complete"
+                and (saved.get("native") or {}).get("complete") is True
+                and saved.get("scene_saved") and saved.get("render_saved")):
+            return {**result, **saved}
+    return result
+
+
 def summed_usage(records, keys, cache_key, source):
     if not records:
         return None
@@ -152,7 +213,7 @@ class LocalArchive:
                 if not folder.is_dir() or folder.is_symlink():
                     continue
                 manifest = read_json(folder / "manifest.json", experiments_root)
-                result = read_json(folder / "result.json", experiments_root)
+                result = presentation_result(folder, read_json(folder / "result.json", experiments_root))
                 if not manifest:
                     continue
                 reference_hash = manifest.get("reference_sha256")
@@ -162,6 +223,8 @@ class LocalArchive:
                 prefix = "agy" if harness == "antigravity" else harness
                 events = folder / "capture" / ("kimi-transcript.jsonl" if harness == "kimi" else f"{prefix}-events.jsonl")
                 usage = reported_usage(events, harness) if is_local_file(events, experiments_root) else None
+                if usage is None and harness == "claude":
+                    usage = gateway_usage_fallback(folder, events)
                 glb_candidate = folder / "evaluation/scene.glb"
                 if not is_local_file(glb_candidate, experiments_root):
                     glb_candidate = folder / "capture/artifacts/scene.glb"
@@ -177,7 +240,7 @@ class LocalArchive:
                     "elapsed_seconds": number(result.get("elapsed_seconds")),
                     "limit_seconds": number(result.get("limit_seconds", manifest.get("experiment_seconds"))),
                     "model_url": asset(glb_candidate, experiments_root, allowed_types=MODEL_TYPES),
-                    "render": asset(folder / "capture/artifacts/render.png", experiments_root),
+                    "render": asset(presentation_asset(folder, "render.png"), experiments_root),
                     "views": {view: asset(folder / "evaluation" / f"{view}.png", experiments_root) for view in VIEWS},
                     "evaluation_status": (result.get("evaluation") or {}).get("status", "unavailable"),
                     "usage": usage,

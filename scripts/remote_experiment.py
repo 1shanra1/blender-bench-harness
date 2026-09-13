@@ -119,6 +119,7 @@ def export_results(batches, include_models=True):
     from tempfile import TemporaryDirectory
     from export_results import build_bundle
     from export_glb import export_run
+    from frontend_data import presentation_asset
 
     results.reload()
     exports = Path("/results/exports")
@@ -134,10 +135,8 @@ def export_results(batches, include_models=True):
                 for run in experiment["runs"]:
                     if run["model_url"]:
                         continue
-                    run_dir = Path("/results/experiments") / experiment["id"] / run["id"]
-                    has_scene = any((run_dir / path).is_file() for path in (
-                        "capture/artifacts/scene.blend", "live-backup/scene.blend"
-                    ))
+                    run_dir = (Path("/results/experiments") / experiment["id"] / run["id"]).resolve()
+                    has_scene = presentation_asset(run_dir, "scene.blend").is_file() or (run_dir / "live-backup/scene.blend").is_file()
                     if has_scene and not export_run(run_dir, blender_path="/usr/local/bin/blender"):
                         raise RuntimeError(f"GLB conversion failed: {run_dir}")
             shutil.rmtree(bundle)

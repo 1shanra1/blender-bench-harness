@@ -11,7 +11,7 @@ from event_log import EventLog
 
 def main():
     model = os.environ["BENCH_MODEL"]
-    if model not in {"google/gemini-3.8-flash", "moonshotai/kimi-k3", "openai/gpt-5.6-luna"}:
+    if model not in {"google/gemini-3.8-flash", "moonshotai/kimi-k3", "openai/gpt-5.6-luna", "openai/gpt-5.6-terra"}:
         raise ValueError(f"Kimi Code model capabilities have not been configured for {model}")
     objective = os.environ["BENCH_OBJECTIVE"]
     if len(objective) > 4000:

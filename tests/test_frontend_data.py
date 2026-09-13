@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from frontend_data import LocalArchive, is_local_file, reported_usage
+from frontend_data import LocalArchive, is_local_file, reported_usage, presentation_asset, presentation_result
 
 
 class ArchiveTests(unittest.TestCase):
@@ -37,6 +37,35 @@ class ArchiveTests(unittest.TestCase):
         experiment = self.archive.catalogue()["experiments"][0]
         self.assertEqual(experiment["name"], "Cordless drill")
         self.assertEqual(self.archive.image_path(experiment["reference"].split("/")[-1]), self.reference)
+
+    def test_rebuild_is_explicit_and_preserves_original_run_status(self):
+        folder = self.run_folder(result={"status": "time_limit", "elapsed_seconds": 5400})
+        rebuilt = folder / "recovery-rebuild"
+        rebuilt.mkdir()
+        image = rebuilt / "rebuilt-render.png"
+        image.write_bytes(b"rebuilt render")
+        self.assertFalse(presentation_asset(folder, "render.png").exists())
+        (rebuilt / "recovery.json").write_text(json.dumps({"kind": "post-run script rebuild"}))
+        run = self.archive.catalogue()["experiments"][0]["runs"][0]
+        self.assertIsNotNone(run["render"])
+        self.assertEqual(run["status"], "time_limit")
+        original = folder / "capture/artifacts/render.png"
+        original.parent.mkdir(parents=True)
+        original.write_bytes(b"original render")
+        self.assertEqual(presentation_asset(folder, "render.png"), original)
+
+    def test_recovered_completion_requires_recorded_supervisor_verdict(self):
+        failure = {"status": "execution_failed", "error": "collection failed"}
+        folder = self.run_folder(result=failure)
+        (folder / "recovery.json").write_text(json.dumps({"blend_validation": ["verified"]}))
+        (folder / "supervisor.log").write_text('{"type":"goal.summary","status":"complete"}\n')
+        self.assertEqual(presentation_result(folder, failure), failure)
+        verdict = {"status": "complete", "native": {"complete": True}, "limit_seconds": 5400,
+                   "elapsed_seconds": 675, "scene_saved": True, "render_saved": True}
+        with (folder / "supervisor.log").open("a") as log:
+            log.write(json.dumps(verdict) + "\n")
+        self.assertEqual(presentation_result(folder, failure)["elapsed_seconds"], 675)
+        self.assertEqual(json.loads((folder / "result.json").read_text()), failure)
 
     def test_disagreeing_or_unknown_reference_is_not_shared(self):
         self.run_folder("codex")

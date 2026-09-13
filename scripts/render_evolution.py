@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from frontend_data import is_local_file, number
+from frontend_data import is_local_file, number, presentation_asset
 
 
 def render_candidate(path):
@@ -44,7 +44,7 @@ def export_evolution(run_dir, assets, limit=6):
             continue
     candidates.sort(key=lambda row: row["elapsed_seconds"])
 
-    final = run_dir / "capture/artifacts/render.png"
+    final = presentation_asset(run_dir, "render.png")
     if is_local_file(final, run_dir):
         digest = hashlib.sha256(final.read_bytes()).hexdigest()
         matched = next((row for row in candidates if row["digest"] == digest), None)

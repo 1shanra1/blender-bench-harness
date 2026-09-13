@@ -68,7 +68,9 @@ print(f'Exported GLB with {len(selected)} objects to: {output_path}')
 
 
 def export_run(run_dir: Path, blender_path=BLENDER_PATH):
-    blend_file = run_dir / "capture" / "artifacts" / "scene.blend"
+    from frontend_data import presentation_asset
+    run_dir = run_dir.resolve()
+    blend_file = presentation_asset(run_dir, "scene.blend")
     if not blend_file.is_file():
         blend_file = run_dir / "live-backup" / "scene.blend"
         if not blend_file.is_file():
