@@ -122,3 +122,5 @@ node --test scripts/prepare-previews.test.mjs
 ```
 
 The frontend build requires an exported `frontend/public/data/` directory. Credentials, raw run data, and generated exports remain Git-ignored.
+
+Note: this was primarily created by Codex for other agents.
